@@ -2,9 +2,9 @@
 
 *A lightweight, zero-dependency Java library for splitting streams and collections into fixed-size chunks.*
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
-[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)]()
-[![Java](https://img.shields.io/badge/Java-8%2B-orange?style=flat-square)]()
+[![Maven Central](https://img.shields.io/maven-central/v/dev.zachmaddox/chunking-collector.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/dev.zachmaddox/chunking-collector/overview)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-8%2B-orange.svg)](https://openjdk.org/)
 
 ---
 
@@ -103,26 +103,6 @@ List<List<T>> Chunking.chunk(int chunkSize, T... elements);
 
 ---
 
-## 🤪 Testing
-
-This project includes **extensive JUnit 5 tests** covering:
-
-* Edge cases (empty inputs, invalid sizes)
-* Parallel stream consistency
-* Order and null preservation
-* Helper methods (`Collection`, `Iterable`, `Stream`, `array`)
-* Randomized round-trip validation
-* Stream closing behavior
-* No empty chunk guarantee
-
-To run tests:
-
-```bash
-mvn clean test
-```
-
----
-
 ## 🧮 Example Use Cases
 
 ### 1. Batch Processing
@@ -184,21 +164,6 @@ Feel free to open issues or pull requests if you have improvements or additional
 
 ---
 
-## 👨‍💻 Project Structure
-
-```
-chunking-collector/
-├── pom.xml
-├── src/
-│   ├── main/java/dev/zachmaddox/chunking/
-│   │   └── Chunking.java
-│   └── test/java/dev/zachmaddox/chunking/
-│       └── ChunkingTest.java
-└── README.md
-```
-
----
-
 ## 🚢 Releasing a New Version
 
 The release process is fully automated via **GitHub Actions** — no manual Sonatype uploads required.
@@ -239,18 +204,3 @@ Once you push the tag:
 * The `CI & Release` workflow runs automatically.
 * It builds, tests, signs, and deploys artifacts to **Sonatype OSSRH**.
 * A GitHub Release (`v1.1.0`) is created with the JAR attached.
-
-### ☁️ 4. Finalize on Maven Central
-
-After the workflow succeeds:
-
-1. Log in at [https://central.sonatype.com](https://central.sonatype.com)
-2. Go to **Publishing → Deployments**
-3. Find your new version (`chunking-collector 1.1.0`)
-4. Click **Publish** — that’s it! 🎉
-
-Your new version will appear on Maven Central within a few minutes.
-
----
-
->
