@@ -44,8 +44,7 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      # ➡️ NEW STEP: Manually create settings.xml with credentials ⬅️
-      # This replaces the failing 'Set up JDK 8 with OSSRH config' step.
+      # 1. MANUAL FIX: Inject OSSRH Credentials (Bypasses the action bug)
       - name: ✍️ Inject OSSRH Credentials into settings.xml
         run: |
           # Create the necessary .m2 directory
@@ -64,7 +63,7 @@ jobs:
           </settings>
           EOF
 
-      # ⚠️ The JDK is now set up here to ensure Maven is available. ⚠️
+      # 2. SET UP JDK (Must run to provide Maven environment)
       - name: Set up JDK 8
         uses: actions/setup-java@v4
         with:
@@ -72,7 +71,7 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
-      # ⚠️ The GPG import action must still run to install the private key. ⚠️
+      # 3. IMPORT GPG Key (Must run to install private key)
       - name: Import GPG Private Key
         uses: actions/setup-java@v4
         with:
@@ -96,26 +95,14 @@ jobs:
             exit 1
           fi
 
-      # 🚀 DEPLOY STEP (Clean and ready) 🚀
+      # 4. DEPLOY (Uses manually created settings.xml)
       - name: Deploy to OSSRH
         run: |
-          # Now relying 100% on the manually created settings.xml file
+          # The command relies on the manually created settings.xml file
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.executable=gpg \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: chunking-collector ${{ steps.mvn-version.outputs.version }}
-          body: |
-            Automated release for `${{ github.ref_name }}`.
-
-            - Version: `${{ steps.mvn-version.outputs.version }}`
-            - Commit: `${{ github.sha }}`
-          files: |
-            target/chunking-collector-*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release
