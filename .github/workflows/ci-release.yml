@@ -44,32 +44,10 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      # 1. MANUAL FIX: Inject CENTRAL Credentials (REQUIRED: Server ID changed to 'central')
-      - name: ✍️ Inject CENTRAL Credentials into settings.xml
-        run: |
-          # Create the necessary .m2 directory
-          mkdir -p ~/.m2
-          
-          # Write the settings.xml file directly, interpolating the literal secrets
-          cat << EOF > ~/.m2/settings.xml
-          <settings>
-            <servers>
-              <server>
-                <id>central</id> ⬅️ CRITICAL CHANGE: Matches new POM configuration
-                <username>${{ secrets.OSSRH_USERNAME }}</username>
-                <password>${{ secrets.OSSRH_PASSWORD }}</password>
-              </server>
-            </servers>
-          </settings>
-          EOF
+      # ❌ REMOVED: The manual settings.xml injection step (was causing the NPE) ❌
+      # ❌ REMOVED: The settings.xml verification step ❌
 
-      # ➡️ NEW DIAGNOSTIC STEP: Check contents ⬅️
-      - name: 🔍 VERIFY settings.xml CONTENT (Masked)
-        run: |
-          echo "--- settings.xml Content ---"
-          cat ~/.m2/settings.xml
-
-      # 2. SET UP JDK (Must run to provide Maven environment)
+      # 1. SET UP JDK (Must run to provide Maven environment)
       - name: Set up JDK 8
         uses: actions/setup-java@v4
         with:
@@ -77,7 +55,7 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
-      # 3. IMPORT GPG Key (Still required for signing)
+      # 2. IMPORT GPG Key (Still required for signing)
       - name: Import GPG Private Key
         uses: actions/setup-java@v4
         with:
@@ -101,15 +79,18 @@ jobs:
             exit 1
           fi
 
-      # 4. DEPLOY (Triggers the new central-publishing-maven-plugin)
+      # 3. DEPLOY (CRITICAL FIX: Credentials passed via environment variables)
       - name: Deploy to Maven Central Portal
+        env:
+          MAVEN_CENTRAL_PORTAL_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_CENTRAL_PORTAL_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
         run: |
-          # The command now executes the new plugin using the 'central' server ID
+          # The command now triggers the new plugin and uses environment variables for authentication
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
 
-      # 5. CREATE RELEASE
+      # 4. CREATE RELEASE
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
