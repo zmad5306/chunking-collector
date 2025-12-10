@@ -24,10 +24,10 @@ jobs:
 
       - name: Set up JDK 8
         uses: actions/setup-java@v4
-        with
-        distribution: 'temurin'
-        java-version: '8'
-        cache: 'maven'
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: 'maven'
 
       - name: Build & run tests
         run: mvn -B clean verify
@@ -53,7 +53,6 @@ jobs:
           cache: 'maven'
 
       # ➡️ CRITICAL FIX 1: Clear settings.xml to prevent NPE ⬅️
-      # Deletes the file actions/setup-java creates, forcing the use of environment variables.
       - name: 🗑️ Clear Conflicting settings.xml
         run: rm -f ~/.m2/settings.xml
 
@@ -81,16 +80,13 @@ jobs:
             exit 1
           fi
 
-      # 3. DEPLOY (Uses Env Vars for Auth, and the directly imported GPG key)
+      # 3. DEPLOY (Uses Env Vars for Auth)
       - name: Deploy to Maven Central Portal
         env:
-          # Official environment variables for central-publishing-maven-plugin
           MAVEN_CENTRAL_PORTAL_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           MAVEN_CENTRAL_PORTAL_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-          # Required for GPG to work in a non-interactive shell environment
           GPG_TTY: $(tty)
         run: |
-          # The command now triggers the new plugin and must use environment variables for authentication
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
