@@ -69,13 +69,15 @@ jobs:
       - name: Import GPG key
         run: |
           echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-        env:
-          GPG_TTY: $(tty)
 
       - name: Create Maven settings.xml for OSSRH
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml << 'EOF'
+          cat > ~/.m2/settings.xml << EOF
           <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -83,8 +85,8 @@ jobs:
             <servers>
               <server>
                 <id>ossrh</id>
-                <username>${env.OSSRH_USERNAME}</username>
-                <password>${env.OSSRH_PASSWORD}</password>
+                <username>${OSSRH_USERNAME}</username>
+                <password>${OSSRH_PASSWORD}</password>
               </server>
             </servers>
 
@@ -93,7 +95,7 @@ jobs:
                 <id>gpg</id>
                 <properties>
                   <gpg.executable>gpg</gpg.executable>
-                  <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
+                  <gpg.passphrase>${GPG_PASSPHRASE}</gpg.passphrase>
                 </properties>
               </profile>
             </profiles>
@@ -103,10 +105,9 @@ jobs:
             </activeProfiles>
           </settings>
           EOF
-        env:
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+          echo "=== Effective settings.xml (password masked) ==="
+          sed -e 's/<password>.*<\/password>/<password>***<\/password>/' ~/.m2/settings.xml
 
       - name: Get project version from Maven
         id: mvn-version
