@@ -44,23 +44,35 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      - name: Set up JDK 8 with OSSRH config
+      # ➡️ NEW STEP: Manually create settings.xml with credentials ⬅️
+      # This replaces the failing 'Set up JDK 8 with OSSRH config' step.
+      - name: ✍️ Inject OSSRH Credentials into settings.xml
+        run: |
+          # Create the necessary .m2 directory
+          mkdir -p ~/.m2
+          
+          # Write the settings.xml file directly, interpolating the literal secrets
+          cat << EOF > ~/.m2/settings.xml
+          <settings>
+            <servers>
+              <server>
+                <id>ossrh</id>
+                <username>${{ secrets.OSSRH_USERNAME }}</username>
+                <password>${{ secrets.OSSRH_PASSWORD }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      # ⚠️ The JDK is now set up here to ensure Maven is available. ⚠️
+      - name: Set up JDK 8
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
-          server-id: ossrh
-          server-username: ${{ secrets.OSSRH_USERNAME }}
-          server-password: ${{ secrets.OSSRH_PASSWORD }}
 
-      # ➡️ NEW DIAGNOSTIC STEP: Check credentials were injected ⬅️
-      - name: CHECK SETTINGS.XML FOR OSSRH CREDENTIALS
-        run: |
-          echo "--- OSSRH SERVER BLOCK ---"
-          # This isolates the server block. If this is missing, the credentials failed to inject.
-          sed -n '/<server/,/<\/server>/p' ~/.m2/settings.xml | grep -A 5 ossrh
-
+      # ⚠️ The GPG import action must still run to install the private key. ⚠️
       - name: Import GPG Private Key
         uses: actions/setup-java@v4
         with:
@@ -84,15 +96,14 @@ jobs:
             exit 1
           fi
 
-      # ➡️ MODIFIED DEPLOY STEP: Reverting to clean injection method ⬅️
+      # 🚀 DEPLOY STEP (Clean and ready) 🚀
       - name: Deploy to OSSRH
         run: |
-          # Relying on credentials in settings.xml (injected by setup-java)
+          # Now relying 100% on the manually created settings.xml file
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.executable=gpg \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
-          # NOTE: Removed the redundant/conflicting -DossrhUsername and -DossrhPassword
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
