@@ -16,6 +16,8 @@ import java.util.stream.StreamSupport;
 
 /**
  * Utility class for chunking streams and iterables into fixed-size lists.
+ *
+ * <p>All chunking methods preserve the encounter order of the input.</p>
  */
 public final class Chunking {
 
@@ -27,6 +29,11 @@ public final class Chunking {
      * Returns a {@link Collector} that groups elements into chunks of {@code chunkSize}.
      *
      * <p>Works with any stream source (lists, sets, arrays via {@code Arrays.stream}, etc.).</p>
+     *
+     * @param <T>       the element type of the stream
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a collector that accumulates elements into a {@code List<List<T>>}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static <T> Collector<T, ?, List<List<T>>> toChunks(int chunkSize) {
         return new ChunkingCollectorImpl<>(chunkSize);
@@ -34,6 +41,13 @@ public final class Chunking {
 
     /**
      * Chunks an {@link Iterable} into a list of lists, using its iteration order.
+     *
+     * @param <T>       the element type
+     * @param iterable  the source iterable; must not be {@code null}
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the iterable has no elements
+     * @throws NullPointerException     if {@code iterable} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static <T> List<List<T>> chunk(Iterable<T> iterable, int chunkSize) {
         Objects.requireNonNull(iterable, "iterable must not be null");
@@ -43,6 +57,13 @@ public final class Chunking {
 
     /**
      * Chunks a {@link Collection} into a list of lists, using its iteration order.
+     *
+     * @param <T>        the element type
+     * @param collection the source collection; must not be {@code null}
+     * @param chunkSize  the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the collection is empty
+     * @throws NullPointerException     if {@code collection} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static <T> List<List<T>> chunk(Collection<T> collection, int chunkSize) {
         Objects.requireNonNull(collection, "collection must not be null");
@@ -51,6 +72,13 @@ public final class Chunking {
 
     /**
      * Chunks a {@link Stream} into a list of lists and closes the stream.
+     *
+     * @param <T>       the element type
+     * @param stream    the source stream; must not be {@code null}
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the stream has no elements
+     * @throws NullPointerException     if {@code stream} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static <T> List<List<T>> chunk(Stream<T> stream, int chunkSize) {
         Objects.requireNonNull(stream, "stream must not be null");
@@ -60,7 +88,14 @@ public final class Chunking {
     }
 
     /**
-     * Varargs convenience method: chunk an array of elements.
+     * Varargs convenience method: chunks an array of elements.
+     *
+     * @param <T>       the element type
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @param elements  the elements to chunk; must not be {@code null}
+     * @return a list of chunks; possibly empty if no elements are provided
+     * @throws NullPointerException     if {@code elements} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     @SafeVarargs
     public static <T> List<List<T>> chunk(int chunkSize, T... elements) {
@@ -72,6 +107,8 @@ public final class Chunking {
 
     /**
      * Internal collector implementation. Users never see this type directly.
+     *
+     * @param <T> element type
      */
     private static final class ChunkingCollectorImpl<T>
             implements Collector<T, List<T>, List<List<T>>> {
