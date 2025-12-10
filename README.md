@@ -85,7 +85,7 @@ Collector<T, ?, List<List<T>>> Chunking.toChunks(int chunkSize)
 * Works for any stream type (`Stream<T>`, `IntStream.boxed()`, etc.).
 * Throws `IllegalArgumentException` for `chunkSize <= 0`.
 
-### 🪄 Convenience Methods
+### 🧤 Convenience Methods
 
 ```java
 // From a Collection
@@ -103,7 +103,7 @@ List<List<T>> Chunking.chunk(int chunkSize, T... elements);
 
 ---
 
-## 🧪 Testing
+## 🤪 Testing
 
 This project includes **extensive JUnit 5 tests** covering:
 
@@ -123,7 +123,7 @@ mvn clean test
 
 ---
 
-## 🤐 Example Use Cases
+## 🧮 Example Use Cases
 
 ### 1. Batch Processing
 
@@ -184,7 +184,7 @@ Feel free to open issues or pull requests if you have improvements or additional
 
 ---
 
-## 🧑‍💻 Project Structure
+## 👨‍💻 Project Structure
 
 ```
 chunking-collector/
@@ -199,5 +199,58 @@ chunking-collector/
 
 ---
 
-> *“Simple things should be simple, complex things should be possible.”*
-> — Alan Kay
+## 🚢 Releasing a New Version
+
+The release process is fully automated via **GitHub Actions** — no manual Sonatype uploads required.
+
+### 🔖 1. Update Version
+
+Edit `pom.xml` and bump the version:
+
+```xml
+<version>1.1.0</version>
+```
+
+Commit the change:
+
+```bash
+git add pom.xml
+git commit -m "chore(release): bump version to 1.1.0"
+```
+
+### 📇 2. Tag the Release
+
+Create an annotated tag:
+
+```bash
+git tag -a v1.1.0 -m "Release v1.1.0"
+```
+
+Push it to GitHub:
+
+```bash
+git push origin main --tags
+```
+
+### ⚙️ 3. GitHub Actions Builds & Publishes
+
+Once you push the tag:
+
+* The `CI & Release` workflow runs automatically.
+* It builds, tests, signs, and deploys artifacts to **Sonatype OSSRH**.
+* A GitHub Release (`v1.1.0`) is created with the JAR attached.
+
+### ☁️ 4. Finalize on Maven Central
+
+After the workflow succeeds:
+
+1. Log in at [https://central.sonatype.com](https://central.sonatype.com)
+2. Go to **Publishing → Deployments**
+3. Find your new version (`chunking-collector 1.1.0`)
+4. Click **Publish** — that’s it! 🎉
+
+Your new version will appear on Maven Central within a few minutes.
+
+---
+
+>
