@@ -1,0 +1,101 @@
+name: CI & Release
+
+on:
+  push:
+    branches:
+      - '**'        # CI on all branches
+    tags:
+      - 'v*'        # Release job will run only for version tags
+  pull_request:
+    branches:
+      - '**'
+
+permissions:
+  contents: write   # needed for creating GitHub releases
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build & run tests
+        run: mvn -B clean verify
+
+      - name: Upload jar artifact (for release job)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: chunking-collector-jar
+          path: target/chunking-collector-*.jar
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Important: checkout the tag ref
+          ref: ${{ github.ref }}
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      - name: Download jar artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: chunking-collector-jar
+          path: dist
+
+      - name: Get project version from Maven
+        # This reads <version> from pom.xml on the tagged commit
+        id: mvn-version
+        run: |
+          VERSION=$(mvn -q -Dexpression=project.version -DforceStdout help:evaluate)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if version is SNAPSHOT
+        run: |
+          if echo "${{ steps.mvn-version.outputs.version }}" | grep -q "SNAPSHOT"; then
+            echo "Refusing to create release for SNAPSHOT version: ${{ steps.mvn-version.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }} # e.g. v1.0.0
+          name: chunking-collector ${{ steps.mvn-version.outputs.version }}
+          body: |
+            Automated release for `${{ github.ref_name }}`.
+
+            - Version: `${{ steps.mvn-version.outputs.version }}`
+            - Commit: `${{ github.sha }}`
+          files: |
+            dist/chunking-collector-*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
