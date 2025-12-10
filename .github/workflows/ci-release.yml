@@ -44,8 +44,9 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      # ❌ THE CONFLICTING STEP HAS BEEN REMOVED FROM HERE ❌
-      # The space is now empty, resolving the NullPointerException conflict.
+      # ➡️ CRITICAL FIX: Delete any settings.xml created by setup-java ⬅️
+      - name: 🗑️ Clear Conflicting settings.xml
+        run: rm -f ~/.m2/settings.xml
 
       # 1. SET UP JDK (Must run to provide Maven environment)
       - name: Set up JDK 8
@@ -79,14 +80,13 @@ jobs:
             exit 1
           fi
 
-      # 3. DEPLOY (CRITICAL FIX: Credentials passed via environment variables)
+      # 3. DEPLOY (Guaranteed to use Environment Variables now)
       - name: Deploy to Maven Central Portal
         env:
-          # The central-publishing-maven-plugin officially supports these variables:
           MAVEN_CENTRAL_PORTAL_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           MAVEN_CENTRAL_PORTAL_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
         run: |
-          # This command now triggers the new plugin and uses environment variables for authentication
+          # The command now triggers the new plugin and must use environment variables for authentication
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
