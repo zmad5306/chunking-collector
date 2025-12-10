@@ -122,7 +122,7 @@ jobs:
           fi
 
       - name: Deploy to OSSRH (staging for Maven Central)
-        run: mvn -B clean deploy -DskipTests=false
+        run: mvn -B -P release clean deploy -DskipTests=false
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
