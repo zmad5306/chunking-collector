@@ -38,7 +38,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.10.2</junit.version>
-        <env.GPG_PASSPHRASE/>
+        <gpg.passphrase/>
     </properties>
 
     <dependencies>
@@ -127,7 +127,7 @@
                             </execution>
                         </executions>
                         <configuration>
-                            <passphrase>${env.GPG_PASSPHRASE}</passphrase>
+                            <passphrase>${gpg.passphrase}</passphrase>
                             <gpgArguments>
                                 <arg>--batch</arg>
                                 <arg>--pinentry-mode</arg>

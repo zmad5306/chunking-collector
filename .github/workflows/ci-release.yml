@@ -37,8 +37,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    env:
-      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     steps:
       - name: Checkout repository
@@ -80,7 +78,7 @@ jobs:
           fi
 
       - name: Deploy to OSSRH
-        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg
+        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
