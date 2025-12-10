@@ -5,7 +5,7 @@ on:
     branches:
       - '**'        # CI on all branches
     tags:
-      - 'v*'        # Release job will run only for version tags
+      - 'v*'        # Release & Central publish on version tags
   pull_request:
     branches:
       - '**'
@@ -39,15 +39,8 @@ jobs:
       - name: Build & run tests
         run: mvn -B clean verify
 
-      - name: Upload jar artifact (for release job)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
-        with:
-          name: chunking-collector-jar
-          path: target/chunking-collector-*.jar
-
   release:
-    name: Create GitHub Release
+    name: Publish to Maven Central & create GitHub Release
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
@@ -56,7 +49,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Important: checkout the tag ref
+          # Important: checkout the tag ref (e.g. refs/tags/v1.0.0)
           ref: ${{ github.ref }}
 
       - name: Set up JDK 8
@@ -65,14 +58,57 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
 
-      - name: Download jar artifact
-        uses: actions/download-artifact@v4
+      - name: Cache Maven repository
+        uses: actions/cache@v4
         with:
-          name: chunking-collector-jar
-          path: dist
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        env:
+          GPG_TTY: $(tty)
+
+      - name: Create Maven settings.xml for OSSRH
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                    xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+
+            <servers>
+              <server>
+                <id>ossrh</id>
+                <username>${env.OSSRH_USERNAME}</username>
+                <password>${env.OSSRH_PASSWORD}</password>
+              </server>
+            </servers>
+
+            <profiles>
+              <profile>
+                <id>gpg</id>
+                <properties>
+                  <gpg.executable>gpg</gpg.executable>
+                  <gpg.passphrase>${env.GPG_PASSPHRASE}</gpg.passphrase>
+                </properties>
+              </profile>
+            </profiles>
+
+            <activeProfiles>
+              <activeProfile>gpg</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Get project version from Maven
-        # This reads <version> from pom.xml on the tagged commit
         id: mvn-version
         run: |
           VERSION=$(mvn -q -Dexpression=project.version -DforceStdout help:evaluate)
@@ -81,9 +117,16 @@ jobs:
       - name: Fail if version is SNAPSHOT
         run: |
           if echo "${{ steps.mvn-version.outputs.version }}" | grep -q "SNAPSHOT"; then
-            echo "Refusing to create release for SNAPSHOT version: ${{ steps.mvn-version.outputs.version }}"
+            echo "Refusing to deploy SNAPSHOT version to Maven Central: ${{ steps.mvn-version.outputs.version }}"
             exit 1
           fi
+
+      - name: Deploy to OSSRH (staging for Maven Central)
+        run: mvn -B clean deploy -DskipTests=false
+        env:
+          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -96,6 +139,6 @@ jobs:
             - Version: `${{ steps.mvn-version.outputs.version }}`
             - Commit: `${{ github.sha }}`
           files: |
-            dist/chunking-collector-*.jar
+            target/chunking-collector-*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
