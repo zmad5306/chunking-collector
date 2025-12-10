@@ -88,7 +88,7 @@ jobs:
           fi
 
       - name: Deploy to OSSRH (staging for Maven Central)
-        run: mvn -B -P release clean deploy -DskipTests=false
+        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.passphrase="${GPG_PASSPHRASE}"
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
