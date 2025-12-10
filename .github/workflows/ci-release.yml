@@ -74,9 +74,20 @@ jobs:
         env:
           OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/.m2
+
+          xml_escape() {
+            echo "$1" | sed -e 's/&/&amp;/g' \
+                             -e 's/</\&lt;/g' \
+                             -e 's/>/\&gt;/g' \
+                             -e 's/"/\&quot;/g' \
+                             -e "s/'/\&apos;/g"
+          }
+
+          U_ESC=$(xml_escape "$OSSRH_USERNAME")
+          P_ESC=$(xml_escape "$OSSRH_PASSWORD")
+
           cat > ~/.m2/settings.xml << EOF
           <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -85,24 +96,11 @@ jobs:
             <servers>
               <server>
                 <id>ossrh</id>
-                <username>${OSSRH_USERNAME}</username>
-                <password>${OSSRH_PASSWORD}</password>
+                <username>${U_ESC}</username>
+                <password>${P_ESC}</password>
               </server>
             </servers>
 
-            <profiles>
-              <profile>
-                <id>gpg</id>
-                <properties>
-                  <gpg.executable>gpg</gpg.executable>
-                  <gpg.passphrase>${GPG_PASSPHRASE}</gpg.passphrase>
-                </properties>
-              </profile>
-            </profiles>
-
-            <activeProfiles>
-              <activeProfile>gpg</activeProfile>
-            </activeProfiles>
           </settings>
           EOF
 
@@ -124,10 +122,8 @@ jobs:
           fi
 
       - name: Deploy to OSSRH (staging for Maven Central)
-        run: mvn -B -P release clean deploy -DskipTests=false
+        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg -Dgpg.passphrase="${GPG_PASSPHRASE}"
         env:
-          OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create GitHub Release
