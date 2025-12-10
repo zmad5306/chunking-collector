@@ -63,6 +63,12 @@ jobs:
           </settings>
           EOF
 
+      # ➡️ NEW DIAGNOSTIC STEP: Check contents ⬅️
+      - name: 🔍 VERIFY settings.xml CONTENT (Masked)
+        run: |
+          echo "--- settings.xml Content ---"
+          cat ~/.m2/settings.xml
+
       # 2. SET UP JDK (Must run to provide Maven environment)
       - name: Set up JDK 8
         uses: actions/setup-java@v4
@@ -104,7 +110,7 @@ jobs:
             -Dgpg.executable=gpg \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
 
-      # 5. CREATE RELEASE (FIXED: Added version reference @v2)
+      # 5. CREATE RELEASE
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -115,3 +121,7 @@ jobs:
 
             - Version: `${{ steps.mvn-version.outputs.version }}`
             - Commit: `${{ github.sha }}`
+          files: |
+            target/chunking-collector-*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
