@@ -26,14 +26,14 @@ Add this dependency to your project’s `pom.xml`:
 <dependency>
   <groupId>dev.zachmaddox</groupId>
   <artifactId>chunking-collector</artifactId>
-  <version>1.0.0-SNAPSHOT</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
 ### Using Gradle
 
 ```groovy
-implementation 'dev.zachmaddox:chunking-collector:1.0.0-SNAPSHOT'
+implementation 'dev.zachmaddox:chunking-collector:1.0.0'
 ```
 
 ---
