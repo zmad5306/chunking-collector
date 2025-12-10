@@ -3,15 +3,15 @@ name: CI & Release
 on:
   push:
     branches:
-      - '**'        # CI on all branches
+      - '**'
     tags:
-      - 'v*'        # Release & Central publish on version tags
+      - 'v*'
   pull_request:
     branches:
       - '**'
 
 permissions:
-  contents: write   # needed for creating GitHub releases
+  contents: write
 
 jobs:
   build:
@@ -27,14 +27,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '8'
-
-      - name: Cache Maven repository
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
+          cache: 'maven'
 
       - name: Build & run tests
         run: mvn -B clean verify
@@ -45,17 +38,12 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     env:
-      # Used by setup-java to write settings.xml
-      MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-      MAVEN_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-      # Used by maven-gpg-plugin via -Dgpg.passphrase
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Important: checkout the tag ref (e.g. refs/tags/v1.0.0)
           ref: ${{ github.ref }}
 
       - name: Set up JDK 8 with OSSRH config
@@ -64,27 +52,18 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
-          # This creates ~/.m2/settings.xml with a <server id="ossrh">
-          server-id: 'ossrh'              # must match <id>ossrh</id> in pom.xml
-          server-username: 'MAVEN_USERNAME'
-          server-password: 'MAVEN_PASSWORD'
-          # NOTE: no gpg-private-key / gpg-passphrase here anymore
+          server-id: ossrh
+          server-username: ${{ secrets.OSSRH_USERNAME }}
+          server-password: ${{ secrets.OSSRH_PASSWORD }}
 
-      - name: Import GPG key
-        run: |
-          echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-
-      - name: Show generated Maven settings.xml (masked)
-        run: |
-          echo "=== ~/.m2/settings.xml ==="
-          sed -e 's/<password>.*<\/password>/<password>***<\/password>/' ~/.m2/settings.xml
-
-      - name: Debug OSSRH env before deploy
-        run: |
-          echo "MAVEN_USERNAME present? $([[ -n \"$MAVEN_USERNAME\" ]] && echo yes || echo no)"
-          echo "MAVEN_PASSWORD length: ${#MAVEN_PASSWORD}"
+      - name: ✍Import GPG Private Key
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Get project version from pom.xml
         id: mvn-version
@@ -100,13 +79,15 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to OSSRH (staging for Maven Central)
-        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg -Dgpg.passphrase="${GPG_PASSPHRASE}"
+      - name: Deploy to OSSRH
+        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }} # e.g. v1.0.0
+          tag_name: ${{ github.ref_name }}
           name: chunking-collector ${{ steps.mvn-version.outputs.version }}
           body: |
             Automated release for `${{ github.ref_name }}`.
