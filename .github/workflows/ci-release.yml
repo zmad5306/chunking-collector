@@ -54,6 +54,13 @@ jobs:
           server-username: ${{ secrets.OSSRH_USERNAME }}
           server-password: ${{ secrets.OSSRH_PASSWORD }}
 
+      # ➡️ NEW DIAGNOSTIC STEP: Check credentials were injected ⬅️
+      - name: CHECK SETTINGS.XML FOR OSSRH CREDENTIALS
+        run: |
+          echo "--- OSSRH SERVER BLOCK ---"
+          # This isolates the server block. If this is missing, the credentials failed to inject.
+          sed -n '/<server/,/<\/server>/p' ~/.m2/settings.xml | grep -A 5 ossrh
+
       - name: Import GPG Private Key
         uses: actions/setup-java@v4
         with:
@@ -77,14 +84,15 @@ jobs:
             exit 1
           fi
 
+      # ➡️ MODIFIED DEPLOY STEP: Reverting to clean injection method ⬅️
       - name: Deploy to OSSRH
         run: |
+          # Relying on credentials in settings.xml (injected by setup-java)
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.executable=gpg \
-            -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}' \
-            -DossrhUsername=${{ secrets.OSSRH_USERNAME }} \
-            -DossrhPassword=${{ secrets.OSSRH_PASSWORD }}
+            -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
+          # NOTE: Removed the redundant/conflicting -DossrhUsername and -DossrhPassword
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
