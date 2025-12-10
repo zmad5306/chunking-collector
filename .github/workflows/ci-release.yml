@@ -78,7 +78,11 @@ jobs:
           fi
 
       - name: Deploy to OSSRH
-        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          mvn -B -P release clean deploy \
+            -DskipTests=false \
+            -Dgpg.executable=gpg \
+            -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
