@@ -56,7 +56,7 @@ jobs:
           server-username: ${{ secrets.OSSRH_USERNAME }}
           server-password: ${{ secrets.OSSRH_PASSWORD }}
 
-      - name: ✍Import GPG Private Key
+      - name: Import GPG Private Key
         uses: actions/setup-java@v4
         with:
           java-version: '8'
@@ -81,8 +81,6 @@ jobs:
 
       - name: Deploy to OSSRH
         run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg
-        env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
