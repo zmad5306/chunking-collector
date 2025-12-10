@@ -45,9 +45,10 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     env:
-      # These env vars are what setup-java will reference in settings.xml
+      # Used by setup-java to write settings.xml
       MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
       MAVEN_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+      # Used by maven-gpg-plugin via -Dgpg.passphrase
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     steps:
@@ -57,19 +58,23 @@ jobs:
           # Important: checkout the tag ref (e.g. refs/tags/v1.0.0)
           ref: ${{ github.ref }}
 
-      - name: Set up JDK 8 with OSSRH + GPG config
+      - name: Set up JDK 8 with OSSRH config
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
-          # This will generate ~/.m2/settings.xml with a <server id="ossrh">
+          # This creates ~/.m2/settings.xml with a <server id="ossrh">
           server-id: 'ossrh'              # must match <id>ossrh</id> in pom.xml
           server-username: 'MAVEN_USERNAME'
           server-password: 'MAVEN_PASSWORD'
-          # These configure GPG for maven-gpg-plugin
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}   # ASCII-armored key
-          gpg-passphrase:  ${{ secrets.GPG_PASSPHRASE }}
+          # NOTE: no gpg-private-key / gpg-passphrase here anymore
+
+      - name: Import GPG key
+        run: |
+          echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Show generated Maven settings.xml (masked)
         run: |
@@ -96,7 +101,7 @@ jobs:
           fi
 
       - name: Deploy to OSSRH (staging for Maven Central)
-        run: mvn -B -P release clean deploy -DskipTests=false
+        run: mvn -B -P release clean deploy -DskipTests=false -Dgpg.executable=gpg -Dgpg.passphrase="${GPG_PASSPHRASE}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
