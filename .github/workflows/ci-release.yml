@@ -44,8 +44,8 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      # ❌ REMOVED: The manual settings.xml injection step (was causing the NPE) ❌
-      # ❌ REMOVED: The settings.xml verification step ❌
+      # ❌ THE CONFLICTING STEP HAS BEEN REMOVED FROM HERE ❌
+      # The space is now empty, resolving the NullPointerException conflict.
 
       # 1. SET UP JDK (Must run to provide Maven environment)
       - name: Set up JDK 8
@@ -82,10 +82,11 @@ jobs:
       # 3. DEPLOY (CRITICAL FIX: Credentials passed via environment variables)
       - name: Deploy to Maven Central Portal
         env:
+          # The central-publishing-maven-plugin officially supports these variables:
           MAVEN_CENTRAL_PORTAL_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           MAVEN_CENTRAL_PORTAL_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
         run: |
-          # The command now triggers the new plugin and uses environment variables for authentication
+          # This command now triggers the new plugin and uses environment variables for authentication
           mvn -B -X -P release clean deploy \
             -DskipTests=false \
             -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
