@@ -82,10 +82,9 @@ jobs:
           mvn -B -P release clean deploy \
             -DskipTests=false \
             -Dgpg.executable=gpg \
-            -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
-        env:
-          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-          MAVEN_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+            -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}' \
+            -DossrhUsername=${{ secrets.OSSRH_USERNAME }} \
+            -DossrhPassword=${{ secrets.OSSRH_PASSWORD }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
