@@ -44,27 +44,21 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      # 1. SET UP JDK (The primary environment setup)
-      - name: Set up JDK 8
+      - name: Set up JDK 8 with Maven Central publishing
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
 
-      # ➡️ CRITICAL FIX 1: Clear settings.xml to prevent NPE ⬅️
-      - name: 🗑️ Clear Conflicting settings.xml
-        run: rm -f ~/.m2/settings.xml
+          # Generate ~/.m2/settings.xml with <server id="central">
+          server-id: 'central'
+          server-username: 'MAVEN_CENTRAL_PORTAL_USERNAME'
+          server-password: 'MAVEN_CENTRAL_PORTAL_PASSWORD'
 
-      # 2. SIMPLE GPG KEY IMPORT (Avoids conflict with dedicated action)
-      - name: 🔑 Import GPG Private Key Directly
-        run: |
-          # Create temporary file for private key
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" > private.key
-          
-          # Import key using the passphrase
-          gpg --batch --passphrase "${{ secrets.GPG_PASSPHRASE }}" --import private.key
-        shell: bash
+          # Import GPG key and wire passphrase into Maven config
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: 'GPG_PASSPHRASE'
 
       - name: Get project version from pom.xml
         id: mvn-version
@@ -80,18 +74,16 @@ jobs:
             exit 1
           fi
 
-      # 3. DEPLOY (Uses Env Vars for Auth)
       - name: Deploy to Maven Central Portal
         env:
+          # These match the names you passed into setup-java
           MAVEN_CENTRAL_PORTAL_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           MAVEN_CENTRAL_PORTAL_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-          GPG_TTY: $(tty)
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mvn -B -X -P release clean deploy \
-            -DskipTests=false \
-            -Dgpg.passphrase='${{ secrets.GPG_PASSPHRASE }}'
+            -DskipTests=false
 
-      # 4. CREATE RELEASE
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
