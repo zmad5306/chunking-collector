@@ -58,12 +58,16 @@ jobs:
           distribution: 'temurin'
           java-version: '8'
           cache: 'maven'
-          # This tells setup-java to create ~/.m2/settings.xml with these creds
-          server-id: 'ossrh'                      # must match <id>ossrh</id> in pom.xml distributionManagement
-          server-username: 'OSSRH_USERNAME'       # env var name
-          server-password: 'OSSRH_PASSWORD'       # env var name
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}   # ASCII-armored key
+          server-id: 'ossrh'
+          server-username: ${{ secrets.OSSRH_USERNAME }}
+          server-password: ${{ secrets.OSSRH_PASSWORD }}
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase:  ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Show generated Maven settings.xml (masked)
+        run: |
+          echo "=== ~/.m2/settings.xml ==="
+          sed -e 's/<password>.*<\/password>/<password>***<\/password>/' ~/.m2/settings.xml
 
       - name: Export OSSRH env for Maven
         env:
