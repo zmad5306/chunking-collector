@@ -3,7 +3,7 @@ name: Publish JavaDoc to GitHub Pages
 on:
   push:
     tags:
-      - 'v*'        # runs on v1.0.0, v1.1.0, etc.
+      - 'v*'        # runs automatically on v1.0.0, v1.1.0, etc.
   workflow_dispatch:
     inputs:
       version:
@@ -27,19 +27,35 @@ jobs:
           java-version: '8'
 
       - name: Build JavaDoc
-        run: mvn -B -q javadoc:javadoc
+        run: |
+          set -e
+          mvn -B javadoc:javadoc
+          echo "=== TARGET LAYOUT ==="
+          ls -R target || echo "No target directory?"
 
       - name: Prepare versioned docs
+        env:
+          DOCS_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -e
 
-          # Strip leading 'v' from tag, e.g. v1.1.0 -> 1.1.0
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "Building docs for version: ${VERSION}"
+          # Prefer explicit input when run manually; fall back to tag name
+          if [ -n "${DOCS_VERSION}" ]; then
+            VERSION="${DOCS_VERSION}"
+            echo "Running via workflow_dispatch for version: ${VERSION}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"   # strip leading 'v' from tag
+            echo "Running via tag push for version: ${VERSION}"
+          fi
+
+          if [ -z "${VERSION}" ]; then
+            echo "ERROR: VERSION is empty. Provide an input when running manually, or trigger via tag."
+            exit 1
+          fi
 
           if [ ! -d target/site/apidocs ]; then
             echo "ERROR: JavaDoc output directory 'target/site/apidocs' not found."
-            echo "Check the 'Build JavaDoc' step for errors."
+            echo "Check the 'Build JavaDoc' step logs above to see where apidocs were written (or why they failed)."
             exit 1
           fi
 
