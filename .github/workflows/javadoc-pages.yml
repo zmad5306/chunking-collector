@@ -32,16 +32,22 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           echo "Building docs for version: ${VERSION}"
 
+          if [ ! -d target/site/apidocs ]; then
+            echo "ERROR: JavaDoc output directory 'target/site/apidocs' not found."
+            echo "Check the 'Build JavaDoc' step for errors."
+            exit 1
+          fi
+
           mkdir -p public
 
           # Put this version under /<version>/
           mkdir -p "public/${VERSION}"
-          cp -r target/site/apidocs/* "public/${VERSION}/"
+          cp -r target/site/apidocs/. "public/${VERSION}/"
 
           # Also update /latest/
           rm -rf public/latest
           mkdir -p public/latest
-          cp -r target/site/apidocs/* public/latest/
+          cp -r target/site/apidocs/. public/latest/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
