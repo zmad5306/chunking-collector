@@ -126,7 +126,7 @@ jobs:
             echo "## Links"
             echo
             echo "📦 Maven Central: ${MAVEN_CENTRAL_URL}"
-            echo "📚 Javadoc (v${VERSION}): ${JAVADOC_URL}"
+            echo "📚 Javadoc: ${JAVADOC_URL}"
           } > build/release-notes.md
 
       - name: Create GitHub Release
