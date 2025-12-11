@@ -84,6 +84,43 @@ jobs:
           mkdir -p public/latest
           cp -r "${APIDOCS_DIR}"/. public/latest/
 
+          # ------------------------------------------------------------------
+          # Build a simple index page at /chunking-collector/
+          # ------------------------------------------------------------------
+          VERSIONS=$(ls -1 public | grep -v latest || true)
+
+          cat > public/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Chunking Collector – JavaDoc</title>
+            <style>
+              body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; }
+              h1 { margin-bottom: 0.5rem; }
+              .versions { margin-top: 1rem; }
+            </style>
+          </head>
+          <body>
+            <h1>Chunking Collector – JavaDoc</h1>
+            <p>Select a version:</p>
+
+            <div class="versions">
+              <div>🔗 <a href="./latest/">latest</a> (currently ${VERSION})</div>
+          EOF
+
+          for v in ${VERSIONS}; do
+            if [ "$v" != "latest" ]; then
+              echo "              <div>🔗 <a href=\"./${v}/\">${v}</a></div>" >> public/index.html
+            fi
+          done
+
+          cat >> public/index.html <<EOF
+            </div>
+          </body>
+          </html>
+          EOF
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
