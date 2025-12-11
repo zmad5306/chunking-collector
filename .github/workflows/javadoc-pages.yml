@@ -39,7 +39,7 @@ jobs:
           echo "Detected project version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      # 🆕 NEW: pull existing versions from gh-pages into public/
+      # 🆕 Pull existing versions from gh-pages into public/
       - name: Backfill existing versions from gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,7 +94,8 @@ jobs:
           # ------------------------------------------------------------------
           # Build a simple index page at /chunking-collector/
           # ------------------------------------------------------------------
-          VERSIONS=$(ls -1 public | grep -v latest || true)
+          # List all version folders except 'latest', sorted newest → oldest
+          VERSIONS=$(ls -1 public | grep -v latest | sort -rV || true)
 
           cat > public/index.html <<EOF
           <!DOCTYPE html>
