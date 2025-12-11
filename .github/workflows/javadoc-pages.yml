@@ -29,9 +29,11 @@ jobs:
       - name: Build JavaDoc
         run: |
           set -e
-          mvn -B javadoc:javadoc
-          echo "=== TARGET LAYOUT ==="
-          ls -R .
+          # Match what you run locally
+          mvn -B clean javadoc:javadoc
+
+          echo "=== TARGET LAYOUT AFTER JAVADOC ==="
+          ls -R target || echo "No target directory?"
 
       - name: Prepare versioned docs
         env:
@@ -53,27 +55,23 @@ jobs:
             exit 1
           fi
 
-          # Try to locate apidocs anywhere under the repo (handles multi-module layouts)
-          APIDOCS_DIR="$(find . -type d -path '*/target/site/apidocs' | head -n 1 || true)"
-
-          echo "Detected APIDOCS_DIR='${APIDOCS_DIR}'"
-
-          if [ -z "${APIDOCS_DIR}" ]; then
-            echo "ERROR: Could not find any 'target/site/apidocs' directory in the workspace."
-            echo "Check the 'Build JavaDoc' step logs above to see where (or if) Javadoc was generated."
+          if [ ! -d target/site/apidocs ]; then
+            echo "ERROR: JavaDoc output directory 'target/site/apidocs' not found."
+            echo "Check the 'Build JavaDoc' step logs above to see why it was not created."
             exit 1
           fi
 
           mkdir -p public
 
           # Put this version under /<version>/
+          rm -rf "public/${VERSION}"
           mkdir -p "public/${VERSION}"
-          cp -r "${APIDOCS_DIR}"/. "public/${VERSION}/"
+          cp -r target/site/apidocs/. "public/${VERSION}/"
 
           # Also update /latest/
           rm -rf public/latest
           mkdir -p public/latest
-          cp -r "${APIDOCS_DIR}"/. public/latest/
+          cp -r target/site/apidocs/. public/latest/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
