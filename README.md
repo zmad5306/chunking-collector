@@ -25,14 +25,14 @@ It’s implemented as a `Collector`, so it fits naturally into the Java Stream A
 <dependency>
   <groupId>dev.zachmaddox</groupId>
   <artifactId>chunking-collector</artifactId>
-  <version>1.1.3</version>
+  <version>1.1.4</version>
 </dependency>
 ```
 
 ### Using Gradle
 
 ```groovy
-implementation 'dev.zachmaddox:chunking-collector:1.1.3'
+implementation 'dev.zachmaddox:chunking-collector:1.1.4'
 ```
 
 ---

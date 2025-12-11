@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.4] - 2025-12-11
+
+### Added
+- GitHub Releases now include a direct link to the project documentation site alongside dependency snippets and Maven Central metadata.
+
+### Changed
+- Updated release workflow to consistently append documentation links to all future release notes.
+
+### Internal
+- No library code updates; automation and documentation improvements only.
+
+---
+
 ## [1.1.3] - 2025-12-11
+
 ### Added
 - GitHub Releases now include **Maven Central links** and **copy-paste dependency snippets** for Maven, Gradle (Groovy), and Gradle (Kotlin) to make adoption easier.
 

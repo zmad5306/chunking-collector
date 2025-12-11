@@ -88,25 +88,20 @@ jobs:
           # Extract latest section from CHANGELOG.md into a temp file
           awk '
             /^## \[/ && found { exit }
+            /^---$/ && found { exit }
             /^## \[/ { found=1 }
             found { print }
           ' CHANGELOG.md > build/changelog-latest.md
 
           VERSION="${{ steps.mvn-version.outputs.version }}"
           MAVEN_CENTRAL_URL="https://central.sonatype.com/artifact/dev.zachmaddox/chunking-collector/${VERSION}"
+          JAVADOC_URL="https://zachmaddox.dev/chunking-collector/${VERSION}/"
 
           {
-            # Optional heading wrapper
             echo "## Chunking Collector ${VERSION}"
             echo
-
-            # The actual changelog for this version
             cat build/changelog-latest.md
             echo
-            echo "---"
-            echo
-
-            # Dependency coordinates section
             echo "## Dependency coordinates"
             echo
             echo "### Maven"
@@ -128,7 +123,10 @@ jobs:
             echo "implementation(\"dev.zachmaddox:chunking-collector:${VERSION}\")"
             echo '```'
             echo
+            echo "## Links"
+            echo
             echo "📦 Maven Central: ${MAVEN_CENTRAL_URL}"
+            echo "📚 Javadoc (v${VERSION}): ${JAVADOC_URL}"
           } > build/release-notes.md
 
       - name: Create GitHub Release
