@@ -40,6 +40,72 @@ jobs:
           echo "Detected project version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+name: Publish JavaDoc to GitHub Pages
+
+on:
+  push:
+    tags:
+      - 'v*'        # runs automatically on v1.0.0, v1.1.0, etc.
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      - name: Build JavaDoc
+        run: |
+          set -e
+          mvn -B clean javadoc:javadoc
+          echo "=== TARGET LAYOUT AFTER JAVADOC ==="
+          ls -R target || echo "No target directory?"
+
+      - name: Get project version from pom.xml
+        id: mvn-version
+        run: |
+          VERSION=$(grep -m1 '<version>' pom.xml | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
+          echo "Detected project version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # 🆕 NEW: pull existing versions from gh-pages into public/
+      - name: Backfill existing versions from gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          mkdir -p public
+
+          # Try to clone existing gh-pages branch (ok if it doesn't exist yet)
+          git clone --depth=1 --branch gh-pages \
+            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            gh-pages-existing || {
+              echo "No existing gh-pages branch; skipping backfill."
+              exit 0
+            }
+
+          # Copy all version folders except 'latest' into public/
+          for d in gh-pages-existing/*/; do
+            dir=$(basename "$d")
+            if [ "$dir" != "latest" ]; then
+              echo "Backfilling existing version folder: $dir"
+              cp -R "$d" "public/$dir"
+            fi
+          done
+
       - name: Prepare versioned docs
         env:
           VERSION: ${{ steps.mvn-version.outputs.version }}
@@ -57,11 +123,12 @@ jobs:
           fi
           echo "Using APIDOCS_DIR='${APIDOCS_DIR}'"
 
-          mkdir -p public
+          # Put this version under /<version>/
           rm -rf "public/${VERSION}"
           mkdir -p "public/${VERSION}"
           cp -r "${APIDOCS_DIR}"/. "public/${VERSION}/"
 
+          # Also update /latest/
           rm -rf public/latest
           mkdir -p public/latest
           cp -r "${APIDOCS_DIR}"/. public/latest/
@@ -86,6 +153,7 @@ jobs:
           <body>
             <h1>Chunking Collector – JavaDoc</h1>
             <p>Select a version:</p>
+
             <div class="versions">
               <div>🔗 <a href="./latest/">latest</a> (currently ${VERSION})</div>
           EOF
@@ -101,6 +169,15 @@ jobs:
           </body>
           </html>
           EOF
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: public
+          keep_files: true
+
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
