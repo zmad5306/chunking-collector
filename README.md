@@ -3,7 +3,7 @@
 *A lightweight, zero-dependency Java library for splitting streams and collections into fixed-size chunks.*
 
 [![Maven Central](https://img.shields.io/maven-central/v/dev.zachmaddox/chunking-collector.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/dev.zachmaddox/chunking-collector/overview)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE.md)
 [![Java](https://img.shields.io/badge/Java-8%2B-orange.svg)](https://openjdk.org/)
 [![JavaDoc](https://img.shields.io/badge/docs-JavaDoc-blue.svg)](https://zmad5306.github.io/chunking-collector/latest/)
 
