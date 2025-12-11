@@ -149,58 +149,115 @@ No other runtime dependencies.
 
 ---
 
-## 📄 License
+## ⚡ Advanced Chunking Features
 
-MIT License © 2025 [Zach Maddox](https://github.com/zmad5306)
+The `Chunking` class now supports several advanced strategies beyond fixed-size chunking.
 
-You’re free to use, modify, and distribute this library for personal or commercial purposes.
+### 1. Remainder Policy
+
+Control how trailing partial chunks are handled:
+
+```java
+List<List<Integer>> chunks = IntStream.rangeClosed(1, 10)
+    .boxed()
+    .collect(Chunking.toChunks(3, Chunking.RemainderPolicy.DROP_PARTIAL));
+```
+
+* `INCLUDE_PARTIAL` (default) – keep the last incomplete chunk
+* `DROP_PARTIAL` – discard it
 
 ---
 
-## 🌟 Contributing
+### 2. Custom Chunk Factory
 
-Contributions are welcome!
-Feel free to open issues or pull requests if you have improvements or additional test scenarios.
+Choose the list implementation created for each chunk:
+
+```java
+List<List<Integer>> chunks = numbers.stream()
+    .collect(Chunking.toChunks(5, ArrayList::new));
+```
+
+Use this to pre-size or provide your own `List` type.
 
 ---
 
-## 🚢 Releasing a New Version
+### 3. Streaming Chunks Lazily
 
-The release process is fully automated via **GitHub Actions** — no manual Sonatype uploads required.
+Process chunks as a **stream of lists** instead of collecting them all:
 
-### 🔖 1. Update Version
-
-Edit `pom.xml` and bump the version:
-
-```xml
-<version>1.1.0</version>
+```java
+try (Stream<List<Integer>> chunkStream =
+         Chunking.streamOfChunks(IntStream.range(0, 20).boxed(), 4)) {
+    chunkStream.forEach(System.out::println);
+}
 ```
 
-Commit the change:
+Automatically closes the underlying stream.
 
-```bash
-git add pom.xml
-git commit -m "chore(release): bump version to 1.1.0"
+---
+
+### 4. Sliding Windows
+
+Create overlapping windows:
+
+```java
+List<List<Integer>> windows = IntStream.rangeClosed(1, 5)
+    .boxed()
+    .collect(Chunking.slidingWindows(3, 1));
+// → [[1,2,3],[2,3,4],[3,4,5]]
 ```
 
-### 📇 2. Tag the Release
+---
 
-Create an annotated tag:
+### 5. Boundary-Based Chunking
 
-```bash
-git tag -a v1.1.0 -m "Release v1.1.0"
+Start a new chunk when a boundary predicate is false:
+
+```java
+List<List<Integer>> groups = numbers.stream()
+    .collect(Chunking.chunkedBy(Integer::equals));
+// Groups consecutive equal elements
 ```
 
-Push it to GitHub:
+> **Ordering Note:** Boundary-based chunking relies on the encounter order of the input stream. If the stream is unordered (such as a parallel stream without `.sequential()`), chunk boundaries may not be predictable. Always use an ordered or sequential stream when grouping by adjacency.
 
-```bash
-git push origin main --tags
+---
+
+### 6. Weighted Chunking
+
+Group elements until a maximum “weight” threshold is reached:
+
+```java
+List<List<String>> chunks = items.stream()
+    .collect(Chunking.weightedChunks(100, String::length));
 ```
 
-### ⚙️ 3. GitHub Actions Builds & Publishes
+Each chunk’s total weight ≤ 100.
 
-Once you push the tag:
+> **Ordering Note:** Weighted chunking also depends on encounter order. Elements are added to chunks sequentially based on their appearance in the stream. If you use an unordered stream, group boundaries will be nondeterministic.
 
-* The `CI & Release` workflow runs automatically.
-* It builds, tests, signs, and deploys artifacts to **Sonatype OSSRH**.
-* A GitHub Release (`v1.1.0`) is created with the JAR attached.
+---
+
+### 7. Primitive Stream Helpers
+
+Convenience methods for primitive streams:
+
+```java
+List<List<Integer>> ints = Chunking.chunk(IntStream.range(0, 10), 3);
+List<List<Long>> longs = Chunking.chunk(LongStream.of(1,2,3,4), 2);
+List<List<Double>> doubles = Chunking.chunk(DoubleStream.of(1.0,2.0,3.0), 2);
+```
+
+---
+
+## ✅ Summary of Advanced APIs
+
+| Category          | Method / Feature                                | Description                                          |
+| ----------------- | ----------------------------------------------- | ---------------------------------------------------- |
+| Remainder Policy  | `toChunks(int, RemainderPolicy)`                | Include or drop trailing chunk                       |
+| Custom Factory    | `toChunks(int, IntFunction<C>)`                 | Custom list type per chunk                           |
+| Lazy Stream       | `streamOfChunks(Stream<T>, …)`                  | Lazily stream chunks                                 |
+| Sliding Windows   | `slidingWindows(int, int)`                      | Overlapping fixed-size windows                       |
+| Boundary Chunking | `chunkedBy(BiPredicate)`                        | Group by boundary condition (ordered input required) |
+| Weighted Chunks   | `weightedChunks(long, ToLongFunction)`          | Max total weight per chunk (ordered input required)  |
+| Primitive Helpers | `chunk(IntStream/LongStream/DoubleStream, int)` | Convenience wrappers                                 |
