@@ -5,15 +5,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.Spliterator;
-import java.util.function.BiConsumer;
 import java.util.function.BiPredicate;
-import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
 import java.util.stream.DoubleStream;
@@ -53,10 +48,6 @@ public final class Chunking {
          */
         DROP_PARTIAL
     }
-
-    // ----------------------------------------------------------------------
-    // Core collectors – fixed-size chunks
-    // ----------------------------------------------------------------------
 
     /**
      * Returns a {@link Collector} that groups elements into chunks of {@code chunkSize},
@@ -156,10 +147,6 @@ public final class Chunking {
         );
     }
 
-    // ----------------------------------------------------------------------
-    // 1.3 – Stream-of-chunks helpers
-    // ----------------------------------------------------------------------
-
     /**
      * Returns a {@link Stream} of fixed-size chunks from the given source stream.
      *
@@ -249,10 +236,6 @@ public final class Chunking {
         return chunkStream.onClose(source::close);
     }
 
-    // ----------------------------------------------------------------------
-    // 2.1 – Sliding windows
-    // ----------------------------------------------------------------------
-
     /**
      * Returns a {@link Collector} that produces sliding windows of size {@code windowSize}
      * with step {@code step}.
@@ -273,10 +256,6 @@ public final class Chunking {
     public static <T> Collector<T, ?, List<List<T>>> slidingWindows(int windowSize, int step) {
         return new SlidingWindowCollectorImpl<>(windowSize, step);
     }
-
-    // ----------------------------------------------------------------------
-    // 2.2 – Chunk-by-predicate / boundary-based
-    // ----------------------------------------------------------------------
 
     /**
      * Returns a {@link Collector} that groups elements into chunks based on a boundary predicate.
@@ -306,10 +285,6 @@ public final class Chunking {
         Objects.requireNonNull(sameGroup, "sameGroup must not be null");
         return new BoundaryChunkingCollectorImpl<>(sameGroup);
     }
-
-    // ----------------------------------------------------------------------
-    // 2.3 – Weighted chunks
-    // ----------------------------------------------------------------------
 
     /**
      * Returns a {@link Collector} that groups elements into chunks such that the sum of
@@ -343,10 +318,6 @@ public final class Chunking {
         Objects.requireNonNull(weigher, "weigher must not be null");
         return new WeightedChunkingCollectorImpl<>(maxWeight, weigher);
     }
-
-    // ----------------------------------------------------------------------
-    // Convenience methods for Collections / Iterables / Streams
-    // ----------------------------------------------------------------------
 
     /**
      * Chunks an {@link Iterable} into a list of lists, using its iteration order.
@@ -421,10 +392,6 @@ public final class Chunking {
         Collections.addAll(list, elements);
         return chunk(list, chunkSize);
     }
-
-    // ----------------------------------------------------------------------
-    // 3.1 – Primitive stream helpers
-    // ----------------------------------------------------------------------
 
     /**
      * Chunks an {@link IntStream} into {@code List<List<Integer>>} and closes it.
@@ -511,359 +478,5 @@ public final class Chunking {
      */
     public static Collector<Double, ?, List<List<Double>>> toDoubleChunks(int chunkSize) {
         return toChunks(chunkSize);
-    }
-
-    // ----------------------------------------------------------------------
-    // Internal collector implementations
-    // ----------------------------------------------------------------------
-
-    /**
-     * Fixed-size chunking collector with {@link RemainderPolicy} and custom chunk factory.
-     */
-    private static final class FixedSizeChunkingCollectorImpl<T, C extends List<T>>
-            implements Collector<T, List<T>, List<C>> {
-
-        private final int chunkSize;
-        private final RemainderPolicy remainderPolicy;
-        private final IntFunction<C> chunkFactory;
-
-        FixedSizeChunkingCollectorImpl(
-                int chunkSize,
-                RemainderPolicy remainderPolicy,
-                IntFunction<C> chunkFactory
-        ) {
-            if (chunkSize < 1) {
-                throw new IllegalArgumentException("Chunk size must be greater than zero.");
-            }
-            this.chunkSize = chunkSize;
-            this.remainderPolicy = Objects.requireNonNull(remainderPolicy, "remainderPolicy must not be null");
-            this.chunkFactory = Objects.requireNonNull(chunkFactory, "chunkFactory must not be null");
-        }
-
-        @Override
-        public Supplier<List<T>> supplier() {
-            return ArrayList::new;
-        }
-
-        @Override
-        public BiConsumer<List<T>, T> accumulator() {
-            return List::add;
-        }
-
-        @Override
-        public BinaryOperator<List<T>> combiner() {
-            return (left, right) -> {
-                if (left.isEmpty()) {
-                    return right;
-                }
-                if (right.isEmpty()) {
-                    return left;
-                }
-                List<T> combined = new ArrayList<>(left.size() + right.size());
-                combined.addAll(left);
-                combined.addAll(right);
-                return combined;
-            };
-        }
-
-        @Override
-        public Function<List<T>, List<C>> finisher() {
-            return allElements -> {
-                int size = allElements.size();
-                if (size == 0) {
-                    return Collections.emptyList();
-                }
-
-                int fullChunkCount = size / chunkSize;
-                boolean hasRemainder = (size % chunkSize) != 0;
-                int estimatedChunks = fullChunkCount +
-                        ((hasRemainder && remainderPolicy == RemainderPolicy.INCLUDE_PARTIAL) ? 1 : 0);
-
-                List<C> chunks = new ArrayList<>(estimatedChunks);
-
-                int start = 0;
-                while (start < size) {
-                    int end = Math.min(start + chunkSize, size);
-                    int length = end - start;
-
-                    if (length < chunkSize && remainderPolicy == RemainderPolicy.DROP_PARTIAL) {
-                        break;
-                    }
-
-                    C chunk = chunkFactory.apply(length);
-                    for (int i = start; i < end; i++) {
-                        chunk.add(allElements.get(i));
-                    }
-                    chunks.add(chunk);
-
-                    start += chunkSize;
-                }
-
-                return chunks;
-            };
-        }
-
-        @Override
-        public Set<Characteristics> characteristics() {
-            // Order matters and finisher is non-identity, so no characteristics.
-            return Collections.emptySet();
-        }
-    }
-
-    /**
-     * Collector that builds sliding windows of fixed size with a fixed step.
-     */
-    private static final class SlidingWindowCollectorImpl<T>
-            implements Collector<T, List<T>, List<List<T>>> {
-
-        private final int windowSize;
-        private final int step;
-
-        SlidingWindowCollectorImpl(int windowSize, int step) {
-            if (windowSize < 1) {
-                throw new IllegalArgumentException("windowSize must be greater than zero.");
-            }
-            if (step < 1) {
-                throw new IllegalArgumentException("step must be greater than zero.");
-            }
-            this.windowSize = windowSize;
-            this.step = step;
-        }
-
-        @Override
-        public Supplier<List<T>> supplier() {
-            return ArrayList::new;
-        }
-
-        @Override
-        public BiConsumer<List<T>, T> accumulator() {
-            return List::add;
-        }
-
-        @Override
-        public BinaryOperator<List<T>> combiner() {
-            return (left, right) -> {
-                if (left.isEmpty()) {
-                    return right;
-                }
-                if (right.isEmpty()) {
-                    return left;
-                }
-                List<T> combined = new ArrayList<>(left.size() + right.size());
-                combined.addAll(left);
-                combined.addAll(right);
-                return combined;
-            };
-        }
-
-        @Override
-        public Function<List<T>, List<List<T>>> finisher() {
-            return allElements -> {
-                int size = allElements.size();
-                if (size < windowSize) {
-                    return Collections.emptyList();
-                }
-                int estimatedCount = 1 + (int) Math.max(0, (size - windowSize) / step);
-                List<List<T>> windows = new ArrayList<>(estimatedCount);
-
-                for (int start = 0; start + windowSize <= size; start += step) {
-                    List<T> window = new ArrayList<>(windowSize);
-                    for (int i = start; i < start + windowSize; i++) {
-                        window.add(allElements.get(i));
-                    }
-                    windows.add(window);
-                }
-
-                return windows;
-            };
-        }
-
-        @Override
-        public Set<Characteristics> characteristics() {
-            return Collections.emptySet();
-        }
-    }
-
-    /**
-     * Collector that groups elements into chunks based on a boundary predicate.
-     */
-    private static final class BoundaryChunkingCollectorImpl<T>
-            implements Collector<T, List<T>, List<List<T>>> {
-
-        private final BiPredicate<? super T, ? super T> sameGroup;
-
-        BoundaryChunkingCollectorImpl(BiPredicate<? super T, ? super T> sameGroup) {
-            this.sameGroup = Objects.requireNonNull(sameGroup, "sameGroup must not be null");
-        }
-
-        @Override
-        public Supplier<List<T>> supplier() {
-            return ArrayList::new;
-        }
-
-        @Override
-        public BiConsumer<List<T>, T> accumulator() {
-            return List::add;
-        }
-
-        @Override
-        public BinaryOperator<List<T>> combiner() {
-            return (left, right) -> {
-                if (left.isEmpty()) {
-                    return right;
-                }
-                if (right.isEmpty()) {
-                    return left;
-                }
-                List<T> combined = new ArrayList<>(left.size() + right.size());
-                combined.addAll(left);
-                combined.addAll(right);
-                return combined;
-            };
-        }
-
-        @Override
-        public Function<List<T>, List<List<T>>> finisher() {
-            return allElements -> {
-                int size = allElements.size();
-                if (size == 0) {
-                    return Collections.emptyList();
-                }
-
-                List<List<T>> result = new ArrayList<>();
-                List<T> current = new ArrayList<>();
-                T previous = null;
-
-                for (int i = 0; i < size; i++) {
-                    T value = allElements.get(i);
-                    if (current.isEmpty()) {
-                        current.add(value);
-                    } else {
-                        if (sameGroup.test(previous, value)) {
-                            current.add(value);
-                        } else {
-                            result.add(current);
-                            current = new ArrayList<>();
-                            current.add(value);
-                        }
-                    }
-                    previous = value;
-                }
-
-                if (!current.isEmpty()) {
-                    result.add(current);
-                }
-
-                return result;
-            };
-        }
-
-        @Override
-        public Set<Characteristics> characteristics() {
-            return Collections.emptySet();
-        }
-    }
-
-    /**
-     * Collector that groups elements into chunks with a maximum total weight.
-     */
-    private static final class WeightedChunkingCollectorImpl<T>
-            implements Collector<T, List<T>, List<List<T>>> {
-
-        private final long maxWeight;
-        private final ToLongFunction<? super T> weigher;
-
-        WeightedChunkingCollectorImpl(long maxWeight, ToLongFunction<? super T> weigher) {
-            if (maxWeight < 1L) {
-                throw new IllegalArgumentException("maxWeight must be greater than zero.");
-            }
-            this.maxWeight = maxWeight;
-            this.weigher = Objects.requireNonNull(weigher, "weigher must not be null");
-        }
-
-        @Override
-        public Supplier<List<T>> supplier() {
-            return ArrayList::new;
-        }
-
-        @Override
-        public BiConsumer<List<T>, T> accumulator() {
-            return List::add;
-        }
-
-        @Override
-        public BinaryOperator<List<T>> combiner() {
-            return (left, right) -> {
-                if (left.isEmpty()) {
-                    return right;
-                }
-                if (right.isEmpty()) {
-                    return left;
-                }
-                List<T> combined = new ArrayList<>(left.size() + right.size());
-                combined.addAll(left);
-                combined.addAll(right);
-                return combined;
-            };
-        }
-
-        @Override
-        public Function<List<T>, List<List<T>>> finisher() {
-            return allElements -> {
-                int size = allElements.size();
-                if (size == 0) {
-                    return Collections.emptyList();
-                }
-
-                List<List<T>> result = new ArrayList<>();
-                List<T> currentChunk = new ArrayList<>();
-                long currentWeight = 0L;
-
-                for (int i = 0; i < size; i++) {
-                    T value = allElements.get(i);
-                    long w = weigher.applyAsLong(value);
-                    if (w < 0L) {
-                        throw new IllegalArgumentException("Element weight must not be negative.");
-                    }
-
-                    // If this element itself is heavier than maxWeight, it forms its own chunk.
-                    if (w > maxWeight) {
-                        if (!currentChunk.isEmpty()) {
-                            result.add(currentChunk);
-                            currentChunk = new ArrayList<>();
-                            currentWeight = 0L;
-                        }
-                        List<T> single = new ArrayList<>(1);
-                        single.add(value);
-                        result.add(single);
-                        continue;
-                    }
-
-                    if (currentChunk.isEmpty()) {
-                        currentChunk.add(value);
-                        currentWeight = w;
-                    } else if (currentWeight + w <= maxWeight) {
-                        currentChunk.add(value);
-                        currentWeight += w;
-                    } else {
-                        result.add(currentChunk);
-                        currentChunk = new ArrayList<>();
-                        currentChunk.add(value);
-                        currentWeight = w;
-                    }
-                }
-
-                if (!currentChunk.isEmpty()) {
-                    result.add(currentChunk);
-                }
-
-                return result;
-            };
-        }
-
-        @Override
-        public Set<Characteristics> characteristics() {
-            return Collections.emptySet();
-        }
     }
 }

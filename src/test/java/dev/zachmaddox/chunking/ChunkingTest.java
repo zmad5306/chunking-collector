@@ -22,14 +22,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ChunkingTest {
 
-    // ----------------------------------------------------------------------
-    // Existing fixed-size chunk tests
-    // ----------------------------------------------------------------------
-
     @Test
     @DisplayName("Chunking an empty list yields an empty list of chunks")
     void emptyInputYieldsEmptyChunks() {
         List<Integer> input = Collections.emptyList();
+        @SuppressWarnings("RedundantOperationOnEmptyContainer")
         List<List<Integer>> result = input.stream()
                 .collect(Chunking.toChunks(3));
 
@@ -136,10 +133,6 @@ class ChunkingTest {
         assertThrows(IllegalArgumentException.class, () -> Chunking.toChunks(-1));
     }
 
-    // ----------------------------------------------------------------------
-    // RemainderPolicy (1.1)
-    // ----------------------------------------------------------------------
-
     @Test
     @DisplayName("DROP_PARTIAL policy drops the trailing incomplete chunk")
     void remainderPolicyDropPartial() {
@@ -199,10 +192,6 @@ class ChunkingTest {
         }
     }
 
-    // ----------------------------------------------------------------------
-    // Custom chunk factory (1.2)
-    // ----------------------------------------------------------------------
-
     static class TrackingList<T> extends ArrayList<T> {
         final int requestedSize;
 
@@ -223,9 +212,9 @@ class ChunkingTest {
                 .collect(Chunking.toChunks(2, TrackingList::new));
 
         assertEquals(3, chunks.size());
-        assertTrue(chunks.get(0) instanceof TrackingList);
-        assertTrue(chunks.get(1) instanceof TrackingList);
-        assertTrue(chunks.get(2) instanceof TrackingList);
+        assertInstanceOf(TrackingList.class, chunks.get(0));
+        assertInstanceOf(TrackingList.class, chunks.get(1));
+        assertInstanceOf(TrackingList.class, chunks.get(2));
 
         assertEquals(2, chunks.get(0).requestedSize);
         assertEquals(2, chunks.get(1).requestedSize);
@@ -256,10 +245,6 @@ class ChunkingTest {
         assertThrows(NullPointerException.class, () -> Chunking.toChunks(3, (java.util.function.IntFunction<List<Integer>>) null));
         assertThrows(NullPointerException.class, () -> Chunking.toChunks(3, RemainderPolicy.INCLUDE_PARTIAL, null));
     }
-
-    // ----------------------------------------------------------------------
-    // 1.3 – streamOfChunks helpers
-    // ----------------------------------------------------------------------
 
     @Test
     @DisplayName("streamOfChunks includes trailing partial chunk by default")
@@ -302,7 +287,9 @@ class ChunkingTest {
 
         try (Stream<List<Integer>> chunkStream = Chunking.streamOfChunks(source, 3)) {
             assertFalse(closed[0], "Stream should not be closed before chunkStream is closed");
-            chunkStream.count();
+
+            long chunkCount = chunkStream.count();
+            assertEquals(4L, chunkCount, "Expected 4 chunks for 10 elements with chunk size 3");
         }
 
         assertTrue(closed[0], "Closing chunkStream should close source stream");
@@ -317,10 +304,6 @@ class ChunkingTest {
         assertThrows(NullPointerException.class,
                 () -> Chunking.streamOfChunks(Stream.of(1, 2, 3), 2, null));
     }
-
-    // ----------------------------------------------------------------------
-    // Sliding windows (2.1)
-    // ----------------------------------------------------------------------
 
     @Test
     @DisplayName("slidingWindows produces full overlapping windows")
@@ -364,10 +347,6 @@ class ChunkingTest {
         assertThrows(IllegalArgumentException.class,
                 () -> Chunking.slidingWindows(1, 0));
     }
-
-    // ----------------------------------------------------------------------
-    // Boundary-based chunking (2.2)
-    // ----------------------------------------------------------------------
 
     @Test
     @DisplayName("chunkedBy groups adjacent equal elements")
@@ -423,10 +402,6 @@ class ChunkingTest {
         assertThrows(NullPointerException.class,
                 () -> Chunking.chunkedBy(null));
     }
-
-    // ----------------------------------------------------------------------
-    // Weighted chunks (2.3)
-    // ----------------------------------------------------------------------
 
     @Test
     @DisplayName("weightedChunks groups by max weight")
@@ -508,10 +483,6 @@ class ChunkingTest {
         }
     }
 
-    // ----------------------------------------------------------------------
-    // Chunking convenience methods tests
-    // ----------------------------------------------------------------------
-
     @Test
     @DisplayName("Chunking a Collection uses iteration order")
     void chunkCollection() {
@@ -527,7 +498,7 @@ class ChunkingTest {
     @Test
     @DisplayName("Chunking a Set respects set iteration order")
     void chunkSet() {
-        Set<Integer> set = new LinkedHashSet<Integer>();
+        Set<Integer> set = new LinkedHashSet<>();
         set.add(5);
         set.add(10);
         set.add(15);
@@ -691,10 +662,6 @@ class ChunkingTest {
         assertTrue(collector.characteristics().isEmpty());
     }
 
-    // ----------------------------------------------------------------------
-    // Primitive helper tests (3.1)
-    // ----------------------------------------------------------------------
-
     @Test
     @DisplayName("chunk(IntStream, ...) works and closes stream")
     void chunkIntStreamHelper() {
@@ -765,10 +732,6 @@ class ChunkingTest {
                 Collections.singletonList(3.0)
         ), doubleChunks);
     }
-
-    // ----------------------------------------------------------------------
-    // Additional guardrail tests or new APIs
-    // ----------------------------------------------------------------------
 
     @Test
     @DisplayName("Primitive helpers reject null streams")
