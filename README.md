@@ -5,6 +5,8 @@
 [![Maven Central](https://img.shields.io/maven-central/v/dev.zachmaddox/chunking-collector.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/dev.zachmaddox/chunking-collector/overview)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-8%2B-orange.svg)](https://openjdk.org/)
+[![JavaDoc](https://img.shields.io/badge/docs-JavaDoc-blue.svg)](https://zmad5306.github.io/chunking-collector/latest/)
+
 
 ---
 
@@ -261,3 +263,9 @@ List<List<Double>> doubles = Chunking.chunk(DoubleStream.of(1.0,2.0,3.0), 2);
 | Boundary Chunking | `chunkedBy(BiPredicate)`                        | Group by boundary condition (ordered input required) |
 | Weighted Chunks   | `weightedChunks(long, ToLongFunction)`          | Max total weight per chunk (ordered input required)  |
 | Primitive Helpers | `chunk(IntStream/LongStream/DoubleStream, int)` | Convenience wrappers                                 |
+
+## 📚 Documentation
+
+* **API Reference (JavaDoc)** → [Latest Version](https://zmad5306.github.io/chunking-collector/latest/)
+* Browse older versions under:  
+  [https://zmad5306.github.io/chunking-collector/](https://zmad5306.github.io/chunking-collector/)

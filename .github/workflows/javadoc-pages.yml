@@ -1,0 +1,52 @@
+name: Publish JavaDoc to GitHub Pages
+
+on:
+  push:
+    tags:
+      - 'v*'        # runs on v1.0.0, v1.1.0, etc.
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      - name: Build JavaDoc
+        run: mvn -B -q javadoc:javadoc
+
+      - name: Prepare versioned docs
+        run: |
+          set -e
+
+          # Strip leading 'v' from tag, e.g. v1.1.0 -> 1.1.0
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "Building docs for version: ${VERSION}"
+
+          mkdir -p public
+
+          # Put this version under /<version>/
+          mkdir -p "public/${VERSION}"
+          cp -r target/site/apidocs/* "public/${VERSION}/"
+
+          # Also update /latest/
+          rm -rf public/latest
+          mkdir -p public/latest
+          cp -r target/site/apidocs/* public/latest/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: public
+          keep_files: true
