@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'        # runs on v1.0.0, v1.1.0, etc.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Library version to publish docs for (e.g. 1.1.0)'
+        required: true
 
 jobs:
   build-and-deploy:
