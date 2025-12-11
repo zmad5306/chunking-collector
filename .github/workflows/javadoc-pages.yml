@@ -55,23 +55,30 @@ jobs:
             exit 1
           fi
 
-          if [ ! -d target/site/apidocs ]; then
-            echo "ERROR: JavaDoc output directory 'target/site/apidocs' not found."
-            echo "Check the 'Build JavaDoc' step logs above to see why it was not created."
+          # Prefer target/site/apidocs (your local), fall back to target/reports/apidocs (CI)
+          if [ -d target/site/apidocs ]; then
+            APIDOCS_DIR="target/site/apidocs"
+          elif [ -d target/reports/apidocs ]; then
+            APIDOCS_DIR="target/reports/apidocs"
+          else
+            echo "ERROR: Could not find 'target/site/apidocs' or 'target/reports/apidocs'."
+            echo "Check the 'Build JavaDoc' step logs above to see where (or if) Javadoc was generated."
             exit 1
           fi
+
+          echo "Using APIDOCS_DIR='${APIDOCS_DIR}'"
 
           mkdir -p public
 
           # Put this version under /<version>/
           rm -rf "public/${VERSION}"
           mkdir -p "public/${VERSION}"
-          cp -r target/site/apidocs/. "public/${VERSION}/"
+          cp -r "${APIDOCS_DIR}"/. "public/${VERSION}/"
 
           # Also update /latest/
           rm -rf public/latest
           mkdir -p public/latest
-          cp -r target/site/apidocs/. public/latest/
+          cp -r "${APIDOCS_DIR}"/. public/latest/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
