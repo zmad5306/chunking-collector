@@ -427,7 +427,15 @@ public final class Chunking {
     // ----------------------------------------------------------------------
 
     /**
-     * Chunk an {@link IntStream} into {@code List<List<Integer>>} and close it.
+     * Chunks an {@link IntStream} into {@code List<List<Integer>>} and closes it.
+     *
+     * <p>The final partial chunk is included.</p>
+     *
+     * @param stream    the source int stream; must not be {@code null}
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the stream has no elements
+     * @throws NullPointerException     if {@code stream} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static List<List<Integer>> chunk(IntStream stream, int chunkSize) {
         Objects.requireNonNull(stream, "stream must not be null");
@@ -437,7 +445,15 @@ public final class Chunking {
     }
 
     /**
-     * Chunk a {@link LongStream} into {@code List<List<Long>>} and close it.
+     * Chunks a {@link LongStream} into {@code List<List<Long>>} and closes it.
+     *
+     * <p>The final partial chunk is included.</p>
+     *
+     * @param stream    the source long stream; must not be {@code null}
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the stream has no elements
+     * @throws NullPointerException     if {@code stream} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static List<List<Long>> chunk(LongStream stream, int chunkSize) {
         Objects.requireNonNull(stream, "stream must not be null");
@@ -447,7 +463,15 @@ public final class Chunking {
     }
 
     /**
-     * Chunk a {@link DoubleStream} into {@code List<List<Double>>} and close it.
+     * Chunks a {@link DoubleStream} into {@code List<List<Double>>} and closes it.
+     *
+     * <p>The final partial chunk is included.</p>
+     *
+     * @param stream    the source double stream; must not be {@code null}
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the stream has no elements
+     * @throws NullPointerException     if {@code stream} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static List<List<Double>> chunk(DoubleStream stream, int chunkSize) {
         Objects.requireNonNull(stream, "stream must not be null");
@@ -458,6 +482,10 @@ public final class Chunking {
 
     /**
      * Convenience collector for {@link IntStream}s.
+     *
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a collector that accumulates {@link Integer} values into fixed-size chunks
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static Collector<Integer, ?, List<List<Integer>>> toIntChunks(int chunkSize) {
         return toChunks(chunkSize);
@@ -465,6 +493,10 @@ public final class Chunking {
 
     /**
      * Convenience collector for {@link LongStream}s.
+     *
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a collector that accumulates {@link Long} values into fixed-size chunks
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static Collector<Long, ?, List<List<Long>>> toLongChunks(int chunkSize) {
         return toChunks(chunkSize);
@@ -472,6 +504,10 @@ public final class Chunking {
 
     /**
      * Convenience collector for {@link DoubleStream}s.
+     *
+     * @param chunkSize the maximum number of elements in each chunk; must be greater than zero
+     * @return a collector that accumulates {@link Double} values into fixed-size chunks
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
      */
     public static Collector<Double, ?, List<List<Double>>> toDoubleChunks(int chunkSize) {
         return toChunks(chunkSize);
