@@ -4,13 +4,8 @@ on:
   push:
     tags:
       - 'v*'        # runs automatically on v1.0.0, v1.1.0, etc.
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Library version to publish docs for (e.g. 1.1.0)'
-        required: true
+  workflow_dispatch: {}   # manual trigger, no input needed
 
-# Needed so github-actions[bot] can push to gh-pages
 permissions:
   contents: write
 
@@ -33,53 +28,40 @@ jobs:
       - name: Build JavaDoc
         run: |
           set -e
-          # Match what you run locally
           mvn -B clean javadoc:javadoc
-
           echo "=== TARGET LAYOUT AFTER JAVADOC ==="
           ls -R target || echo "No target directory?"
 
+      # 🔽 detect the version directly from pom.xml
+      - name: Get project version from pom.xml
+        id: mvn-version
+        run: |
+          VERSION=$(grep -m1 '<version>' pom.xml | sed -E 's/.*<version>([^<]+)<\/version>.*/\1/')
+          echo "Detected project version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
       - name: Prepare versioned docs
         env:
-          DOCS_VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.mvn-version.outputs.version }}
         run: |
           set -e
+          echo "Preparing JavaDoc for version: ${VERSION}"
 
-          # Prefer explicit input when run manually; fall back to tag name
-          if [ -n "${DOCS_VERSION}" ]; then
-            VERSION="${DOCS_VERSION}"
-            echo "Running via workflow_dispatch for version: ${VERSION}"
-          else
-            VERSION="${GITHUB_REF_NAME#v}"   # strip leading 'v' from tag
-            echo "Running via tag push for version: ${VERSION}"
-          fi
-
-          if [ -z "${VERSION}" ]; then
-            echo "ERROR: VERSION is empty. Provide an input when running manually, or trigger via tag."
-            exit 1
-          fi
-
-          # Prefer target/site/apidocs (your local), fall back to target/reports/apidocs (CI)
           if [ -d target/site/apidocs ]; then
             APIDOCS_DIR="target/site/apidocs"
           elif [ -d target/reports/apidocs ]; then
             APIDOCS_DIR="target/reports/apidocs"
           else
-            echo "ERROR: Could not find 'target/site/apidocs' or 'target/reports/apidocs'."
-            echo "Check the 'Build JavaDoc' step logs above to see where (or if) Javadoc was generated."
+            echo "ERROR: Could not find Javadoc directory."
             exit 1
           fi
-
           echo "Using APIDOCS_DIR='${APIDOCS_DIR}'"
 
           mkdir -p public
-
-          # Put this version under /<version>/
           rm -rf "public/${VERSION}"
           mkdir -p "public/${VERSION}"
           cp -r "${APIDOCS_DIR}"/. "public/${VERSION}/"
 
-          # Also update /latest/
           rm -rf public/latest
           mkdir -p public/latest
           cp -r "${APIDOCS_DIR}"/. public/latest/
@@ -104,7 +86,6 @@ jobs:
           <body>
             <h1>Chunking Collector – JavaDoc</h1>
             <p>Select a version:</p>
-
             <div class="versions">
               <div>🔗 <a href="./latest/">latest</a> (currently ${VERSION})</div>
           EOF
