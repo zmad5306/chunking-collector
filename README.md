@@ -7,7 +7,6 @@
 [![Java](https://img.shields.io/badge/Java-8%2B-orange.svg)](https://openjdk.org/)
 [![JavaDoc](https://img.shields.io/badge/docs-JavaDoc-blue.svg)](https://zmad5306.github.io/chunking-collector/latest/)
 
-
 ---
 
 ## ✨ Overview
@@ -83,23 +82,12 @@ public class Example {
 Collector<T, ?, List<List<T>>> Chunking.toChunks(int chunkSize)
 ```
 
-* Use directly in a stream pipeline.
-* Works for any stream type (`Stream<T>`, `IntStream.boxed()`, etc.).
-* Throws `IllegalArgumentException` for `chunkSize <= 0`.
-
 ### 🧤 Convenience Methods
 
 ```java
-// From a Collection
 List<List<T>> Chunking.chunk(Collection<T> collection, int chunkSize);
-
-// From an Iterable
 List<List<T>> Chunking.chunk(Iterable<T> iterable, int chunkSize);
-
-// From a Stream (auto-closes)
 List<List<T>> Chunking.chunk(Stream<T> stream, int chunkSize);
-
-// From an array (varargs)
 List<List<T>> Chunking.chunk(int chunkSize, T... elements);
 ```
 
@@ -119,10 +107,6 @@ Chunking.chunk(records, 100)
 ```java
 var pages = results.stream()
     .collect(Chunking.toChunks(500));
-
-for (List<Record> page : pages) {
-    saveAll(page);
-}
 ```
 
 ### 3. Parallel Workloads
@@ -135,57 +119,86 @@ Chunking.chunk(items, 10)
 
 ---
 
-## 🧩 Design Philosophy
+# 🌱 Real-World Examples
 
-The implementation avoids mutable state or shared accumulators beyond what `Collector` provides.
-All sublists returned are **copies**, ensuring isolation between chunks and immutability of the source data.
+## 🔥 Splitting Huge Predicate Lists to Avoid Parameter Limits
+
+Many JDBC drivers impose limits on the number of parameters allowed in an SQL query. Chunking helps keep each query under this limit.
+
+```java
+List<UUID> ids = loadIds();
+
+NamedParameterJdbcTemplate named = new NamedParameterJdbcTemplate(jdbcTemplate);
+
+Chunking.chunk(ids, 500)
+    .parallelStream()
+    .map(chunk -> named.query(
+        "SELECT * FROM users WHERE id IN (:ids)",
+        Map.of("ids", chunk),
+        (rs, rowNum) -> mapRow(rs)
+    ))
+    .flatMap(List::stream)
+    .toList();
+```
 
 ---
 
-## 🛠️ Requirements
+## 🌿 Spring Examples
 
-* **Java 8+**
-* **Maven 3.6+**
+### Spring MVC Controller
 
-No other runtime dependencies.
+```java
+@GetMapping("/users/batched")
+public ResponseEntity<List<List<UserDto>>> getUsersBatched() {
+    List<UserDto> users = userService.findAll();
+
+    List<List<UserDto>> batches = users.stream()
+        .collect(Chunking.toChunks(250));
+
+    return ResponseEntity.ok(batches);
+}
+```
+
+### Batch Writes
+
+```java
+List<Order> orders = orderRepository.findAll();
+
+Chunking.chunk(orders, 100)
+    .forEach(orderRepository::saveAll);
+```
+
+---
+
+## ⚛️ Reactor / WebFlux Example
+
+```java
+Flux<Order> orders = orderService.findAll();
+
+orders
+    .buffer(200)
+    .flatMap(orderClient::sendBatch)
+    .then()
+    .subscribe();
+```
 
 ---
 
 ## ⚡ Advanced Chunking Features
 
-The `Chunking` class now supports several advanced strategies beyond fixed-size chunking.
-
-### 1. Remainder Policy
-
-Control how trailing partial chunks are handled:
+### Remainder Policy
 
 ```java
-List<List<Integer>> chunks = IntStream.rangeClosed(1, 10)
-    .boxed()
-    .collect(Chunking.toChunks(3, Chunking.RemainderPolicy.DROP_PARTIAL));
+.collect(Chunking.toChunks(3, Chunking.RemainderPolicy.DROP_PARTIAL));
 ```
 
-* `INCLUDE_PARTIAL` (default) – keep the last incomplete chunk
-* `DROP_PARTIAL` – discard it
-
----
-
-### 2. Custom Chunk Factory
-
-Choose the list implementation created for each chunk:
+### Custom Chunk Factory
 
 ```java
-List<List<Integer>> chunks = numbers.stream()
-    .collect(Chunking.toChunks(5, ArrayList::new));
+.collect(Chunking.toChunks(5, ArrayList::new));
 ```
 
-Use this to pre-size or provide your own `List` type.
-
----
-
-### 3. Streaming Chunks Lazily
-
-Process chunks as a **stream of lists** instead of collecting them all:
+### Lazy Chunk Streaming
 
 ```java
 try (Stream<List<Integer>> chunkStream =
@@ -194,78 +207,34 @@ try (Stream<List<Integer>> chunkStream =
 }
 ```
 
-Automatically closes the underlying stream.
-
----
-
-### 4. Sliding Windows
-
-Create overlapping windows:
+### Sliding Windows
 
 ```java
-List<List<Integer>> windows = IntStream.rangeClosed(1, 5)
-    .boxed()
-    .collect(Chunking.slidingWindows(3, 1));
-// → [[1,2,3],[2,3,4],[3,4,5]]
+.collect(Chunking.slidingWindows(3, 1));
+```
+
+### Boundary-Based Chunking
+
+```java
+.collect(Chunking.chunkedBy(Integer::equals));
+```
+
+### Weighted Chunking
+
+```java
+.collect(Chunking.weightedChunks(100, String::length));
+```
+
+### Primitive Stream Helpers
+
+```java
+Chunking.chunk(IntStream.range(0, 10), 3);
 ```
 
 ---
-
-### 5. Boundary-Based Chunking
-
-Start a new chunk when a boundary predicate is false:
-
-```java
-List<List<Integer>> groups = numbers.stream()
-    .collect(Chunking.chunkedBy(Integer::equals));
-// Groups consecutive equal elements
-```
-
-> **Ordering Note:** Boundary-based chunking relies on the encounter order of the input stream. If the stream is unordered (such as a parallel stream without `.sequential()`), chunk boundaries may not be predictable. Always use an ordered or sequential stream when grouping by adjacency.
-
----
-
-### 6. Weighted Chunking
-
-Group elements until a maximum “weight” threshold is reached:
-
-```java
-List<List<String>> chunks = items.stream()
-    .collect(Chunking.weightedChunks(100, String::length));
-```
-
-Each chunk’s total weight ≤ 100.
-
-> **Ordering Note:** Weighted chunking also depends on encounter order. Elements are added to chunks sequentially based on their appearance in the stream. If you use an unordered stream, group boundaries will be nondeterministic.
-
----
-
-### 7. Primitive Stream Helpers
-
-Convenience methods for primitive streams:
-
-```java
-List<List<Integer>> ints = Chunking.chunk(IntStream.range(0, 10), 3);
-List<List<Long>> longs = Chunking.chunk(LongStream.of(1,2,3,4), 2);
-List<List<Double>> doubles = Chunking.chunk(DoubleStream.of(1.0,2.0,3.0), 2);
-```
-
----
-
-## ✅ Summary of Advanced APIs
-
-| Category          | Method / Feature                                | Description                                          |
-| ----------------- | ----------------------------------------------- | ---------------------------------------------------- |
-| Remainder Policy  | `toChunks(int, RemainderPolicy)`                | Include or drop trailing chunk                       |
-| Custom Factory    | `toChunks(int, IntFunction<C>)`                 | Custom list type per chunk                           |
-| Lazy Stream       | `streamOfChunks(Stream<T>, …)`                  | Lazily stream chunks                                 |
-| Sliding Windows   | `slidingWindows(int, int)`                      | Overlapping fixed-size windows                       |
-| Boundary Chunking | `chunkedBy(BiPredicate)`                        | Group by boundary condition (ordered input required) |
-| Weighted Chunks   | `weightedChunks(long, ToLongFunction)`          | Max total weight per chunk (ordered input required)  |
-| Primitive Helpers | `chunk(IntStream/LongStream/DoubleStream, int)` | Convenience wrappers                                 |
 
 ## 📚 Documentation
 
-* **API Reference (JavaDoc)** → [Latest Version](https://zmad5306.github.io/chunking-collector/latest/)
-* Browse older versions under:  
-  [https://zmad5306.github.io/chunking-collector/](https://zmad5306.github.io/chunking-collector/)
+**JavaDoc:** [https://zmad5306.github.io/chunking-collector/latest/](https://zmad5306.github.io/chunking-collector/latest/)
+
+**Versions:** [https://zmad5306.github.io/chunking-collector/](https://zmad5306.github.io/chunking-collector/)
