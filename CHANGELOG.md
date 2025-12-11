@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.3] - 2025-12-11
+### Added
+- GitHub Releases now include **Maven Central links** and **copy-paste dependency snippets** for Maven, Gradle (Groovy), and Gradle (Kotlin) to make adoption easier.
+
+### Changed
+- Enhanced release automation: CI workflow appends dependency instructions to the extracted changelog section when generating GitHub Releases.
+
+### Internal
+- Release workflow improvements only — no changes to library code or public API.
+- Behavior remains identical to 1.1.2; this is a documentation/automation enhancement release.
+
+---
+
 ## [1.1.2] - 2025-12-11
 ### Added
 - Automated release notes generation: GitHub Releases now pull the **latest section of `CHANGELOG.md`** and use it as the official release body.

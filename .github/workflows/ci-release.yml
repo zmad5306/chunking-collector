@@ -81,14 +81,55 @@ jobs:
           mvn -B -P release clean deploy \
             -DskipTests=false
 
-      - name: Prepare release notes from CHANGELOG
+      - name: Prepare release notes from CHANGELOG and add dependency info
         run: |
           mkdir -p build
+
+          # Extract latest section from CHANGELOG.md into a temp file
           awk '
             /^## \[/ && found { exit }
             /^## \[/ { found=1 }
             found { print }
-          ' CHANGELOG.md > build/release-notes.md
+          ' CHANGELOG.md > build/changelog-latest.md
+
+          VERSION="${{ steps.mvn-version.outputs.version }}"
+          MAVEN_CENTRAL_URL="https://central.sonatype.com/artifact/dev.zachmaddox/chunking-collector/${VERSION}"
+
+          {
+            # Optional heading wrapper
+            echo "## Chunking Collector ${VERSION}"
+            echo
+
+            # The actual changelog for this version
+            cat build/changelog-latest.md
+            echo
+            echo "---"
+            echo
+
+            # Dependency coordinates section
+            echo "## Dependency coordinates"
+            echo
+            echo "### Maven"
+            echo '```xml'
+            echo "<dependency>"
+            echo "  <groupId>dev.zachmaddox</groupId>"
+            echo "  <artifactId>chunking-collector</artifactId>"
+            echo "  <version>${VERSION}</version>"
+            echo "</dependency>"
+            echo '```'
+            echo
+            echo "### Gradle (Groovy DSL)"
+            echo '```groovy'
+            echo "implementation \"dev.zachmaddox:chunking-collector:${VERSION}\""
+            echo '```'
+            echo
+            echo "### Gradle (Kotlin DSL)"
+            echo '```kotlin'
+            echo "implementation(\"dev.zachmaddox:chunking-collector:${VERSION}\")"
+            echo '```'
+            echo
+            echo "📦 Maven Central: ${MAVEN_CENTRAL_URL}"
+          } > build/release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
