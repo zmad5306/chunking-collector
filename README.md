@@ -21,8 +21,6 @@ It’s implemented as a `Collector`, so it fits naturally into the Java Stream A
 
 ### Using Maven
 
-Add this dependency to your project’s `pom.xml`:
-
 ```xml
 <dependency>
   <groupId>dev.zachmaddox</groupId>
