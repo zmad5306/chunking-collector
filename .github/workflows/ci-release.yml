@@ -81,16 +81,21 @@ jobs:
           mvn -B -P release clean deploy \
             -DskipTests=false
 
+      - name: Prepare release notes from CHANGELOG
+        run: |
+          mkdir -p build
+          awk '
+            /^## \[/ && found { exit }
+            /^## \[/ { found=1 }
+            found { print }
+          ' CHANGELOG.md > build/release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: chunking-collector ${{ steps.mvn-version.outputs.version }}
-          body: |
-            Automated release for `${{ github.ref_name }}`.
-
-            - Version: `${{ steps.mvn-version.outputs.version }}`
-            - Commit: `${{ github.sha }}`
+          body_path: build/release-notes.md
           files: |
             target/chunking-collector-*.jar
         env:

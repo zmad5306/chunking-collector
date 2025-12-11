@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.2] - 2025-12-11
+### Added
+- Automated release notes generation: GitHub Releases now pull the **latest section of `CHANGELOG.md`** and use it as the official release body.
+
+### Changed
+- Updated CI workflow to replace hard-coded “Automated release…” text with accurate changelog-based notes.
+- Ensures all future releases consistently include detailed change descriptions.
+
+### Internal
+- No library code changes; behavior and API remain identical.
+- Release pipeline now produces cleaner, more informative GitHub Releases.
+
+---
+
 ## [1.1.1] - 2025-12-11
 
 ### Changed
