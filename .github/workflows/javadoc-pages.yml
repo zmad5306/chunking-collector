@@ -10,6 +10,10 @@ on:
         description: 'Library version to publish docs for (e.g. 1.1.0)'
         required: true
 
+# Needed so github-actions[bot] can push to gh-pages
+permissions:
+  contents: write
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
