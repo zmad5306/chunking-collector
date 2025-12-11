@@ -31,7 +31,7 @@ jobs:
           set -e
           mvn -B javadoc:javadoc
           echo "=== TARGET LAYOUT ==="
-          ls -R target || echo "No target directory?"
+          ls -R .
 
       - name: Prepare versioned docs
         env:
@@ -53,9 +53,14 @@ jobs:
             exit 1
           fi
 
-          if [ ! -d target/site/apidocs ]; then
-            echo "ERROR: JavaDoc output directory 'target/site/apidocs' not found."
-            echo "Check the 'Build JavaDoc' step logs above to see where apidocs were written (or why they failed)."
+          # Try to locate apidocs anywhere under the repo (handles multi-module layouts)
+          APIDOCS_DIR="$(find . -type d -path '*/target/site/apidocs' | head -n 1 || true)"
+
+          echo "Detected APIDOCS_DIR='${APIDOCS_DIR}'"
+
+          if [ -z "${APIDOCS_DIR}" ]; then
+            echo "ERROR: Could not find any 'target/site/apidocs' directory in the workspace."
+            echo "Check the 'Build JavaDoc' step logs above to see where (or if) Javadoc was generated."
             exit 1
           fi
 
@@ -63,12 +68,12 @@ jobs:
 
           # Put this version under /<version>/
           mkdir -p "public/${VERSION}"
-          cp -r target/site/apidocs/. "public/${VERSION}/"
+          cp -r "${APIDOCS_DIR}"/. "public/${VERSION}/"
 
           # Also update /latest/
           rm -rf public/latest
           mkdir -p public/latest
-          cp -r target/site/apidocs/. public/latest/
+          cp -r "${APIDOCS_DIR}"/. public/latest/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
