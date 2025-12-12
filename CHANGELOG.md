@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2025-12-11
+
+### Added
+- New `RemainderPolicy` options:
+    - `PAD_WITH_NULLS` — pads the final chunk to `chunkSize`.
+    - `ERROR_IF_PARTIAL` — throws when the input is not evenly divisible.
+- New overload of `toChunks` supporting:
+    - Custom chunk list factory (`IntFunction<C>`)
+    - Custom outer collection type (`Supplier<OC>`)
+- New streaming helpers:
+    - `forEachChunk(Stream<T>, ...)` for chunk-by-chunk processing without materializing all chunks.
+    - `streamOfChunks(Stream<T>, int, RemainderPolicy)` with full remainder-policy semantics.
+- New sliding-window streaming API:
+    - `streamOfSlidingWindows(Stream<T>, windowSize)`
+    - `streamOfSlidingWindows(Stream<T>, windowSize, step)`
+- New helpers for direct chunking of additional types:
+    - `chunk(Spliterator<T>, int)` for direct spliterator processing.
+
+### Changed
+- Collectors now use `ListCombiners.mergingLists()` to remove duplicated combiner logic.
+- Improved internal estimation logic and error handling across collector implementations.
+- Simplified loop constructs (e.g., enhanced for-loops) in multiple collectors.
+
+### Internal
+- Comprehensive new test suites added for:
+    - `chunkedBy`, weighted chunking, sliding windows, spliterator processing, streaming APIs, and remainder policies.
+- Added **JaCoCo** with a **98% minimum instruction coverage requirement**.
+- Updated build workflows and documentation references to use **JDK 17** for Javadoc compatibility.
+- Version bumped to **1.2.0** in project metadata and README.
+
+---
+
 ## [1.1.4] - 2025-12-11
 
 ### Added
