@@ -98,8 +98,6 @@ jobs:
           JAVADOC_URL="https://zachmaddox.dev/chunking-collector/${VERSION}/"
 
           {
-            echo "## Chunking Collector ${VERSION}"
-            echo
             cat build/changelog-latest.md
             echo
             echo "## Dependency coordinates"
