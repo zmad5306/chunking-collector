@@ -9,8 +9,10 @@ import java.util.Spliterator;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
+import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collector;
+import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
@@ -46,7 +48,23 @@ public final class Chunking {
         /**
          * Drop the final chunk if it is smaller than {@code chunkSize}.
          */
-        DROP_PARTIAL
+        DROP_PARTIAL,
+
+        /**
+         * Pad the final chunk with {@code null} values until it reaches {@code chunkSize}.
+         *
+         * <p>This is primarily useful when consumers require every chunk to have a uniform size
+         * and can safely handle {@code null} values inside the chunk. For primitive streams,
+         * this policy applies after boxing (for example, {@code IntStream} becomes {@code Stream<Integer>}).</p>
+         */
+        PAD_WITH_NULLS,
+
+        /**
+         * Fail fast if the input size is not evenly divisible by {@code chunkSize}.
+         *
+         * <p>An {@link IllegalStateException} is thrown if a trailing partial chunk would be required.</p>
+         */
+        ERROR_IF_PARTIAL
     }
 
     /**
@@ -148,6 +166,62 @@ public final class Chunking {
     }
 
     /**
+     * Returns a {@link Collector} that groups elements into chunks of {@code chunkSize},
+     * using a custom {@link RemainderPolicy}, a custom chunk list implementation, and
+     * a custom outer collection type.
+     *
+     * <p>This overload is useful when you want the <em>outer</em> collection to be something
+     * other than a {@link List}, for example a {@link java.util.LinkedHashSet} of chunk lists.</p>
+     *
+     * <pre>{@code
+     * Collector<Integer, ?, LinkedHashSet<List<Integer>>> collector =
+     *         Chunking.toChunks(
+     *                 3,
+     *                 RemainderPolicy.INCLUDE_PARTIAL,
+     *                 ArrayList::new,
+     *                 LinkedHashSet::new
+     *         );
+     * }</pre>
+     *
+     * @param <T>                   the element type
+     * @param <C>                   the list implementation used for individual chunks
+     * @param <OC>                  the outer collection type that will hold all chunks
+     * @param chunkSize             the maximum number of elements in each chunk; must be greater than zero
+     * @param remainderPolicy       how to handle the final partial chunk; must not be {@code null}
+     * @param chunkFactory          factory used to create each chunk list; must not be {@code null}
+     * @param outerCollectionFactory factory used to create the outer collection; must not be {@code null}
+     * @return a collector that accumulates elements into an {@code OC}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
+     * @throws NullPointerException     if {@code remainderPolicy}, {@code chunkFactory}, or
+     *                                  {@code outerCollectionFactory} is {@code null}
+     */
+    public static <T, C extends List<T>, OC extends Collection<C>> Collector<T, ?, OC> toChunks(
+            int chunkSize,
+            RemainderPolicy remainderPolicy,
+            IntFunction<C> chunkFactory,
+            Supplier<OC> outerCollectionFactory
+    ) {
+        Objects.requireNonNull(remainderPolicy, "remainderPolicy must not be null");
+        Objects.requireNonNull(chunkFactory, "chunkFactory must not be null");
+        Objects.requireNonNull(outerCollectionFactory, "outerCollectionFactory must not be null");
+
+        Collector<T, ?, List<C>> baseCollector = new FixedSizeChunkingCollectorImpl<>(
+                chunkSize,
+                remainderPolicy,
+                chunkFactory
+        );
+
+        return Collectors.collectingAndThen(
+                baseCollector,
+                chunks -> {
+                    OC outer = outerCollectionFactory.get();
+                    outer.addAll(chunks);
+                    return outer;
+                }
+        );
+    }
+
+    /**
      * Returns a {@link Stream} of fixed-size chunks from the given source stream.
      *
      * <p>The returned stream is lazy and consumes the source stream as it is traversed.
@@ -197,6 +271,7 @@ public final class Chunking {
             @Override
             public boolean tryAdvance(Consumer<? super List<T>> action) {
                 List<T> chunk = new ArrayList<>(chunkSize);
+                //noinspection StatementWithEmptyBody
                 while (chunk.size() < chunkSize && baseSpliterator.tryAdvance(chunk::add)) {
                     // keep filling chunk
                 }
@@ -205,9 +280,20 @@ public final class Chunking {
                     return false;
                 }
 
-                if (chunk.size() < chunkSize && remainderPolicy == RemainderPolicy.DROP_PARTIAL) {
-                    // We reached the end with an incomplete chunk; drop it.
-                    return false;
+                if (chunk.size() < chunkSize) {
+                    if (remainderPolicy == RemainderPolicy.DROP_PARTIAL) {
+                        // We reached the end with an incomplete chunk; drop it.
+                        return false;
+                    }
+                    if (remainderPolicy == RemainderPolicy.ERROR_IF_PARTIAL) {
+                        throw new IllegalStateException(
+                                "Input size was not evenly divisible by chunkSize=" + chunkSize);
+                    }
+                    if (remainderPolicy == RemainderPolicy.PAD_WITH_NULLS) {
+                        while (chunk.size() < chunkSize) {
+                            chunk.add(null);
+                        }
+                    }
                 }
 
                 action.accept(chunk);
@@ -236,6 +322,66 @@ public final class Chunking {
         return chunkStream.onClose(source::close);
     }
 
+
+    /**
+     * Processes each fixed-size chunk from the given source stream using the provided consumer,
+     * without materializing all chunks in memory at once.
+     *
+     * <p>This is a convenience wrapper around {@link #streamOfChunks(Stream, int)} for the common
+     * "stream-and-handle-chunks" use case:</p>
+     *
+     * <pre>{@code
+     * Chunking.forEachChunk(
+     *         someStream,
+     *         100,
+     *         chunk -> doSomethingWith(chunk)
+     * );
+     * }</pre>
+     *
+     * <p>The source stream is always closed when processing completes or if an exception is thrown.</p>
+     *
+     * @param <T>          element type
+     * @param source       the source stream; must not be {@code null}
+     * @param chunkSize    the maximum number of elements in each chunk; must be greater than zero
+     * @param chunkHandler consumer that will be invoked once per emitted chunk; must not be {@code null}
+     * @throws NullPointerException     if {@code source} or {@code chunkHandler} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
+     */
+    public static <T> void forEachChunk(
+            Stream<T> source,
+            int chunkSize,
+            Consumer<? super List<T>> chunkHandler
+    ) {
+        Objects.requireNonNull(chunkHandler, "chunkHandler must not be null");
+        try (Stream<List<T>> chunks = streamOfChunks(source, chunkSize)) {
+            chunks.forEach(chunkHandler);
+        }
+    }
+
+    /**
+     * Processes each fixed-size chunk from the given source stream using the provided consumer,
+     * with an explicit {@link RemainderPolicy}.
+     *
+     * @param <T>             element type
+     * @param source          the source stream; must not be {@code null}
+     * @param chunkSize       the maximum number of elements in each chunk; must be greater than zero
+     * @param remainderPolicy how to handle the final partial chunk; must not be {@code null}
+     * @param chunkHandler    consumer that will be invoked once per emitted chunk; must not be {@code null}
+     * @throws NullPointerException     if {@code source}, {@code remainderPolicy}, or {@code chunkHandler} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
+     */
+    public static <T> void forEachChunk(
+            Stream<T> source,
+            int chunkSize,
+            RemainderPolicy remainderPolicy,
+            Consumer<? super List<T>> chunkHandler
+    ) {
+        Objects.requireNonNull(chunkHandler, "chunkHandler must not be null");
+        try (Stream<List<T>> chunks = streamOfChunks(source, chunkSize, remainderPolicy)) {
+            chunks.forEach(chunkHandler);
+        }
+    }
+
     /**
      * Returns a {@link Collector} that produces sliding windows of size {@code windowSize}
      * with step {@code step}.
@@ -255,6 +401,122 @@ public final class Chunking {
      */
     public static <T> Collector<T, ?, List<List<T>>> slidingWindows(int windowSize, int step) {
         return new SlidingWindowCollectorImpl<>(windowSize, step);
+    }
+
+
+    /**
+     * Returns a {@link Stream} of sliding windows of size {@code windowSize} with step {@code 1}.
+     *
+     * <p>This is the streaming counterpart to {@link #slidingWindows(int, int)}, emitting each
+     * window lazily without retaining all windows in memory.</p>
+     *
+     * @param <T>        element type
+     * @param source     the source stream; must not be {@code null}
+     * @param windowSize the size of each window; must be greater than zero
+     * @return a stream of windows as {@code List<T>}
+     * @throws NullPointerException     if {@code source} is {@code null}
+     * @throws IllegalArgumentException if {@code windowSize} is less than {@code 1}
+     */
+    public static <T> Stream<List<T>> streamOfSlidingWindows(Stream<T> source, int windowSize) {
+        return streamOfSlidingWindows(source, windowSize, 1);
+    }
+
+    /**
+     * Returns a {@link Stream} of sliding windows of size {@code windowSize} with the given step.
+     *
+     * <p>Only full windows are produced. Semantics match {@link #slidingWindows(int, int)} but
+     * in a streaming form.</p>
+     *
+     * @param <T>        element type
+     * @param source     the source stream; must not be {@code null}
+     * @param windowSize the size of each window; must be greater than zero
+     * @param step       the step between window starting positions; must be greater than zero
+     * @return a stream of windows as {@code List<T>}
+     * @throws NullPointerException     if {@code source} is {@code null}
+     * @throws IllegalArgumentException if {@code windowSize} or {@code step} is less than {@code 1}
+     */
+    public static <T> Stream<List<T>> streamOfSlidingWindows(
+            Stream<T> source,
+            int windowSize,
+            int step
+    ) {
+        Objects.requireNonNull(source, "source must not be null");
+        if (windowSize < 1) {
+            throw new IllegalArgumentException("windowSize must be greater than zero.");
+        }
+        if (step < 1) {
+            throw new IllegalArgumentException("step must be greater than zero.");
+        }
+
+        Spliterator<T> baseSpliterator = source.spliterator();
+
+        Spliterator<List<T>> windowSpliterator = new Spliterator<List<T>>() {
+            private final java.util.ArrayDeque<T> buffer = new java.util.ArrayDeque<>(windowSize);
+            private boolean initialized = false;
+            private boolean completed = false;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super List<T>> action) {
+                if (completed) {
+                    return false;
+                }
+
+                if (!initialized) {
+                    //noinspection StatementWithEmptyBody
+                    while (buffer.size() < windowSize && baseSpliterator.tryAdvance(buffer::addLast)) {
+                        // fill initial window
+                    }
+                    initialized = true;
+                } else {
+                    int moved = 0;
+                    while (moved < step && !buffer.isEmpty()) {
+                        buffer.removeFirst();
+                        moved++;
+                    }
+                    //noinspection StatementWithEmptyBody
+                    while (buffer.size() < windowSize && baseSpliterator.tryAdvance(buffer::addLast)) {
+                        // fill subsequent windows
+                    }
+                }
+                if (buffer.size() < windowSize) {
+                    completed = true;
+                    return false;
+                }
+
+                List<T> window = new ArrayList<>(windowSize);
+                window.addAll(buffer);
+                action.accept(window);
+                return true;
+            }
+
+            @Override
+            public Spliterator<List<T>> trySplit() {
+                // no splitting; keep implementation simple and ordered
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                long baseSize = baseSpliterator.estimateSize();
+                if (baseSize == Long.MAX_VALUE || baseSize == 0) {
+                    return baseSize;
+                }
+                // Rough upper bound; we don't need this to be exact.
+                if (baseSize < windowSize) {
+                    return 0;
+                }
+                return 1 + Math.max(0, (baseSize - windowSize) / step);
+            }
+
+            @Override
+            public int characteristics() {
+                // Preserve ORDERED; drop SIZED/SUBSIZED because of the sliding semantics.
+                return baseSpliterator.characteristics() & Spliterator.ORDERED;
+            }
+        };
+
+        Stream<List<T>> stream = StreamSupport.stream(windowSpliterator, false);
+        return stream.onClose(source::close);
     }
 
     /**
@@ -334,6 +596,25 @@ public final class Chunking {
     public static <T> List<List<T>> chunk(Iterable<T> iterable, int chunkSize) {
         Objects.requireNonNull(iterable, "iterable must not be null");
         return StreamSupport.stream(iterable.spliterator(), false)
+                .collect(toChunks(chunkSize));
+    }
+
+
+    /**
+     * Chunks a {@link Spliterator} into a list of lists, using its traversal order.
+     *
+     * <p>The final partial chunk is included.</p>
+     *
+     * @param <T>        the element type
+     * @param spliterator the source spliterator; must not be {@code null}
+     * @param chunkSize  the maximum number of elements in each chunk; must be greater than zero
+     * @return a list of chunks; possibly empty if the spliterator has no elements
+     * @throws NullPointerException     if {@code spliterator} is {@code null}
+     * @throws IllegalArgumentException if {@code chunkSize} is less than {@code 1}
+     */
+    public static <T> List<List<T>> chunk(Spliterator<T> spliterator, int chunkSize) {
+        Objects.requireNonNull(spliterator, "spliterator must not be null");
+        return StreamSupport.stream(spliterator, false)
                 .collect(toChunks(chunkSize));
     }
 

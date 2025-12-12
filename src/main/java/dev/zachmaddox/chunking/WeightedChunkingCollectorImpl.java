@@ -41,18 +41,7 @@ final class WeightedChunkingCollectorImpl<T>
 
     @Override
     public BinaryOperator<List<T>> combiner() {
-        return (left, right) -> {
-            if (left.isEmpty()) {
-                return right;
-            }
-            if (right.isEmpty()) {
-                return left;
-            }
-            List<T> combined = new ArrayList<>(left.size() + right.size());
-            combined.addAll(left);
-            combined.addAll(right);
-            return combined;
-        };
+        return ListCombiners.mergingLists();
     }
 
     @Override
@@ -67,8 +56,7 @@ final class WeightedChunkingCollectorImpl<T>
             List<T> currentChunk = new ArrayList<>();
             long currentWeight = 0L;
 
-            for (int i = 0; i < size; i++) {
-                T value = allElements.get(i);
+            for (T value : allElements) {
                 long w = weigher.applyAsLong(value);
                 if (w < 0L) {
                     throw new IllegalArgumentException("Element weight must not be negative.");
