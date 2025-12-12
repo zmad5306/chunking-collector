@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"dev.zachmaddox.chunking","l":"Chunking"},{"p":"dev.zachmaddox.chunking","l":"Chunking.RemainderPolicy"}];updateSearchResults();
